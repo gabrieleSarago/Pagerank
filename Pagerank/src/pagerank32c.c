@@ -46,12 +46,23 @@
 #include <time.h>
 #include <xmmintrin.h>
 
+/*
+ * NOTA 1: define sostituisce le occorrenze (MATRIX, VECTOR, etc.) col valore corrispondente
+ * siccome è qualcosa che fa il preprocessore, utilizzarle non oppupa memoria e non inficia
+ * le prestazioni. Utilizzare GRAPHD e GRAPHS risulta quindi una scelta appropriata.
+ *
+ * NOTA 2: per eseguire il codice bisognerà utilizzare gcc e non eclipse, dato che librerie come
+ * math.h hanno bisogno dell'argomento -lm per poter funzionare.
+ */
 
-#define	MATRIX		double*
-#define	VECTOR		double*
-#define	GRAPH		double*	// DECIDERE LA RAPPRESENTAZIONE IN MEMORIA (dev'essere un puntatore)
+#define	MATRIX	double*
+#define	VECTOR	double*
+#define	GRAPHD	double*	// DECIDERE LA RAPPRESENTAZIONE IN MEMORIA (dev'essere un puntatore) (float* o double*)
+#define GRAPHS	float* //rappresentazione in precisione singola
 
-
+/*
+ * Struct riferita agli archi del grafo (?), per ora non usata.
+ */
 typedef struct {
 	int x;
 	int y;
@@ -61,7 +72,8 @@ typedef struct {
 typedef struct {
 	char* file_name;
 	MATRIX P; // codifica dense
-	GRAPH G; // codifica full
+	GRAPHD G; // codifica full (sparse) double
+	GRAPHS S; // codifica sparse single
 	int N; // numero di nodi
 	int M; // numero di archi
 	double c; // default=0.85
@@ -77,7 +89,7 @@ typedef struct {
 
 /*
  * 
- *	Le funzioni sono state scritte assumento che le matrici siano memorizzate 
+ *	Le funzioni sono state scritte assumendo che le matrici siano memorizzate
  * 	mediante un array (float*), in modo da occupare un unico blocco
  * 	di memoria, ma a scelta del candidato possono essere 
  * 	memorizzate mediante array di array (float**).
@@ -86,11 +98,26 @@ typedef struct {
  * 	matrici per righe (row-major order) o per colonne (column major-order).
  *
  * 	L'assunzione corrente è che le matrici siano in row-major order.
+ *
+ * 	La scelta è quella di mantenere il row-major order, in quanto
+ * 	risulta intuitivo elaborare gli elementi.
  * 
  */
 
+/*
+ * TODO: possibile accorpamento delle seguenti 4 funzioni in due.
+ * Fare chiamate a più funzioni comporta allocare più activation frame
+ * nello stack, e questo fa sprecare tempo. Bisogna attuare un compromesso tra
+ * velocità di esecuzione e modularità del codice.
+ */
 
-void* get_block(int size, int elements) { 
+void* get_block(int size, int elements) {
+	/*
+	 * _mm_malloc si utilizza per allocare un blocco "allineato" di memoria.
+	 * Siccome ogni sistema operativo ha una funzione diversa per fare ciò,
+	 * utilizzare _mm_malloc consente di fare la stessa operazione in modo
+	 * indipendente dal S.O. in uso (POSIX => Linux/non-POSIX => Windows).
+	 */
 	return _mm_malloc(elements*size,16); 
 }
 
@@ -122,6 +149,7 @@ void dealloc_matrix(MATRIX mat) {
  * 	primi 4 byte: numero di righe (N) --> numero intero a 32 bit
  * 	successivi 4 byte: numero di colonne (M) --> numero intero a 32 bit
  * 	successivi N*M*4 byte: matrix data in row-major order --> numeri floating-point a precisione doppia
+ * 	Siccome è precisione doppia (double) non è N*M*4 ma N*M*8, dato che un double occupa 8 byte
  * 
  *****************************************************************************
  *	Se lo si ritiene opportuno, è possibile cambiare la codifica in memoria
@@ -134,7 +162,9 @@ MATRIX load_dense(char* filename, int *n, int *m) {
 	int rows, cols, status, i;
 	char fpath[256];
 	
+	//sprintf salva il contenuto puntato da filename in un array di max 256 caratteri
 	sprintf(fpath, "%s.matrix", filename);
+	//apre il file non come un file di testo ma come un file binario (read binary - rb)
 	fp = fopen(fpath, "rb");
 	
 	if (fp == NULL) {
@@ -142,15 +172,24 @@ MATRIX load_dense(char* filename, int *n, int *m) {
 		exit(0);
 	}
 	
+	/*fread salva in un blocco di memoria puntato dal primo argomento
+	* (in questo caso &rows) il numero di byte letti, ottenuto come
+	* numero_elementi*size_elementi (in questo caso 1*4, dove 4
+	* è dato da sizeof(int))
+	*/
 	status = fread(&rows, sizeof(int), 1, fp);
 	status = fread(&cols, sizeof(int), 1, fp);
 		
 	MATRIX data = alloc_matrix(rows,cols);
+	//Salva la matrice (in precisione doppia) nel blocco di memoria puntato da data
 	status = fread(data, sizeof(double), rows*cols, fp);
+
 	fclose(fp);
-	
+
+	//salva le dimensioni della matrice in n ed m
 	*n = rows;
-	*m = rows*cols;
+	//dovrebbe essere *m = cols;
+	*m = rows*cols; //(?)
 	
 	return data;
 }
@@ -168,7 +207,7 @@ MATRIX load_dense(char* filename, int *n, int *m) {
  * 	successivi M*2*4 byte: M archi rappresentati come coppie (i,j) di interi a 32 bit 
  * 
  */
-GRAPH load_sparse(char* filename, int *n, int *m) {	
+GRAPHD load_sparse_double(char* filename, int *n, int *m) {
 	FILE* fp;
 	int nodes, arcs, status, i;
 	char fpath[256];
@@ -184,24 +223,86 @@ GRAPH load_sparse(char* filename, int *n, int *m) {
 	
 	status = fread(&nodes, sizeof(int), 1, fp);
 	status = fread(&arcs, sizeof(int), 1, fp);
-
-	GRAPH g; // = ...; // alloca la struttura dati contenente il grafo
 	
+	/*
+	 * Matrice di adiacenza n*n, dove n è il numero di nodi
+	 * il puntatore g punta a un blocco di memoria di nodes*nodes elementi
+	 * dove ogni elemento occupa 8 byte. In questo momento la matrice contiene solo
+	 * 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
+	 */
+	GRAPHD g = _mm_malloc(nodes*nodes*sizeof(double),16); //alloca la struttura dati contenente il grafo
+	/*
+	 * Nota: per accedere all'elemento g[i][j]
+	 * bisogna fare g[i*nodes + j]
+	 * perchè si tratta di una allocazione di una matrice, simulata
+	 * con un vettore, usando il calcolo esplicito degli elementi.
+	 */
 	for (i = 0; i < arcs; i++) {
 		status = fread(&sorg, sizeof(int), 1, fp);
 		status = fread(&dest, sizeof(int), 1, fp);
 		// aggiungi l'arco (sorg,dest) a g
+		/*
+		 * Riga = sorg, colonna = dest, g[sorg][dest] = 1
+		 */
+		g[sorg*nodes + dest] = 1;
 	}
 	fclose(fp);
 	
-	*n = arcs;
-	*m = nodes;
+	*n = nodes;
+	*m = arcs;
 	
-	// return g;
-	return NULL;
+	return g;
 }
 
+/*
+ * Versione a precisione singola
+ */
 
+GRAPHS load_sparse_single(char* filename, int *n, int *m){
+	FILE* fp;
+	int nodes, arcs, status, i;
+	char fpath[256];
+	int sorg, dest;
+
+	sprintf(fpath, "%s.graph", filename);
+	fp = fopen(fpath, "rb");
+
+	if (fp == NULL) {
+		printf("'%s' : bad graph file name!\n", fpath);
+		exit(0);
+	}
+
+	status = fread(&nodes, sizeof(int), 1, fp);
+	status = fread(&arcs, sizeof(int), 1, fp);
+
+	/*
+	 * Matrice di adiacenza n*n, dove n è il numero di nodi
+	 * il puntatore g punta a un blocco di memoria di nodes*nodes elementi
+	 * dove ogni elemento occupa 4 byte. In questo momento la matrice contiene solo
+	 * 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
+	 * TODO: bisogna convertire la matrice da float* a double*
+	 */
+	GRAPHS s = _mm_malloc(nodes*nodes*sizeof(float), 16); //alloca la struttura dati contenente il grafo
+	/*
+	 * Anche in questo caso s[i][j] = s[i*nodes + j]
+	 */
+	for (i = 0; i < arcs; i++) {
+		status = fread(&sorg, sizeof(int), 1, fp);
+		status = fread(&dest, sizeof(int), 1, fp);
+		// aggiungi l'arco (sorg,dest) a s
+		s[sorg*nodes + dest] = 1;
+	}
+	fclose(fp);
+
+	*n = nodes;
+	*m = arcs;
+
+	return s;
+}
+
+/*
+ * Salva su file di testo i risultati
+ */
 void save_pageranks(char* filename, int n, VECTOR pagerank) {	
 	FILE* fp;
 	int i;
@@ -214,7 +315,10 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 	fclose(fp);
 }
 
-
+/*
+ * Prototipo che si riferisce a una funzione presente in
+ * un altro file.
+ */
 extern void pagerank32(params* input);
 
 
@@ -254,11 +358,17 @@ void pagerank(params* input) {
 
 int main(int argc, char** argv) {
 	
+	//alloca un blocco di memoria, puntato da input, che contiene una struct params
 	params* input = malloc(sizeof(params));
 
+	/*Inizializzazione membri della struct
+	 * format indica il formato sparse o dense, default = sparse
+	 * precisione di default = singola
+	 */
 	input->file_name = NULL;
 	input->P = NULL; // dense format
-	input->G = NULL; // sparse format
+	input->G = NULL; // sparse double format
+	input->S = NULL; // sparse single format
 	input->N = 0; // number of nodes
 	input->M = 0; // number of arcs
 	input->c = 0.85;
@@ -317,7 +427,7 @@ int main(int argc, char** argv) {
 			input->opt = OPT;
 			par++;
 		} else
-			par++;
+			par++; //ignora i parametri che non rispettano le regole
 	}
 	
 	if (!input->silent) {
@@ -338,8 +448,12 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 	
-	if (input->format == 0)
-		input->G = load_sparse(input->file_name, &input->N, &input->M);
+	if (input->format == 0){
+		if(input->prec == SINGLE)
+			input->S = load_sparse_single(input->file_name, &input->N, &input->M);
+		else
+			input->G = load_sparse_double(input->file_name, &input->N, &input->M);
+	}
 	else
 		input->P = load_dense(input->file_name, &input->N, &input->M);
 		
