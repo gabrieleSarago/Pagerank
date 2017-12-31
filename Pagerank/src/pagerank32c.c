@@ -333,9 +333,11 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 
 float* get_outdegree_single(int n, float *A);
 float* get_matrix_P_single(int n, float *A, float *d);
+void get_matrix_P_primo_single(int n, float *P, float *d);
 
 double* get_outdegree_double(int n, double *A);
 double* get_matrix_P_double(int n, double *A, double *d);
+void get_matrix_P_primo_double(int n, double *P, double *d);
 
 /*
  *	pagerank
@@ -373,6 +375,27 @@ void pagerank(params* input) {
 				printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
 			}
 		}*/
+
+		/*
+		 * 2° step: passare dalla matrice P a una matrice di transizione valida P'
+		 * data da P'[i][j] >= 0 e somma(P'[i]) = 1.
+		 * Gli elementi di P sono ottenuti tramite divisione di due quantità positive
+		 * perchè gli elementi di A sono [0,1] e gli elementi di d sono >= 0.
+		 * Di conseguenza la matrice P ha elementi >= 0. La seconda proprietà può non essere
+		 * soddisfatta se è presente un elemento di d nullo, perchè questo significa che
+		 * esiste un nodo che non ha archi uscenti. Se ciò si verifica si impone:
+		 * P' = P + D con D = delta * v
+		 * altrimenti P' = P
+		 * Tutto ciò si traduce sostituendo le righe di P a cui corrisponde un outdegree nullo
+		 * con v = (1/n,...,1/n). Al fine di evitare ulteriori allocamenti di memoria, P' sarà
+		 * ottenuta modificando la matrice P, per questo motivo la seguente funzione non restituisce
+		 * nessuna matrice.
+		 */
+		get_matrix_P_primo_single(input->N, P, d);
+		//TODO: 3° step - passare da P' a P'' in precisione singola
+		/*meglio calcolare il pagerank sia qui che nell'altro ramo if
+		 * così da convertire il vettore dei pagerank da float a double
+		 */
 	}
 	//precisione doppia
 	else if(input->G != NULL){
@@ -383,6 +406,13 @@ void pagerank(params* input) {
 				printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
 			}
 		}*/
+		get_matrix_P_primo_double(input->N, P, d);
+		//TODO: 3° step - passare da P' a P'' in precisione doppia
+		/*
+		 * Suggerimento - il codice da P'' al pagerank qui è lo stesso
+		 * del codice nel ramo else, quindi si potrebbe usare una sola funzione
+		 * da chiamare in tutte e due le parti.
+		 */
 	}
 	//verifica formato dense
 	else{
@@ -470,6 +500,37 @@ double* get_matrix_P_double(int n, double *A, double *d){
 		}
 	}
 	return P;
+}
+
+/*
+ * Descrizione = modifica la matrice P in modo che sia una
+ * matrice di transizione P' valida.
+ * Ingresso = dimensione matrice P (n), matrice di transizione (P), vettore degli
+ * outdegree (d)
+ * Post-Condizione = Matrice di transizione P valida
+ */
+
+void get_matrix_P_primo_single(int n, float *P, float *d){
+	//verifica i nodi "i" che non hanno link di uscita
+	for(int i = 0; i < n; i++){
+		//se l'outdegree è nullo sostituisce la riga con v
+		if(d[i] == 0){
+			for(int j = 0; j < n; j++){
+				P[i*n + j] = 1/(float)n;
+			}
+		}
+	}
+}
+
+void get_matrix_P_primo_double(int n, double *P, double *d){
+	//verifica i nodi "i" che non hanno link di uscita
+	for(int i = 0; i < n; i++){
+		if(d[i] == 0){
+			for(int j = 0; j < n; j++){
+				P[i*n + j] = 1/(double)n;
+			}
+		}
+	}
 }
 
 
