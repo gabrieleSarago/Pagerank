@@ -37,6 +37,16 @@
  
  ./runpagerank32
 
+ Compilazione e test parte in C:
+
+ Posizionarsi nella cartella dove si trova il file (/git/Pagerank/Pagerank/src)
+ gcc -O0 pagerank32c.c -o pagerank32c
+ Test precisione singola:
+ ./pagerank32c /home/<user>/git/Pagerank/Pagerank/src/test1 -d -sparse -single -c 0.85 -eps 1e-5
+ Test precisione doppia:
+ ./pagerank32c /home/<user>/git/Pagerank/Pagerank/src/test1 -d -sparse -double -c 0.85 -eps 1e-5
+ Sostituire <user> col proprio nome utente
+
 */
 
 #include <stdlib.h>
@@ -230,7 +240,7 @@ GRAPHD load_sparse_double(char* filename, int *n, int *m) {
 	 * dove ogni elemento occupa 8 byte. In questo momento la matrice contiene solo
 	 * 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
 	 */
-	GRAPHD g = _mm_malloc(nodes*nodes*sizeof(double),16); //alloca la struttura dati contenente il grafo
+	GRAPHD g = (GRAPHD)_mm_malloc(nodes*nodes*sizeof(double),16); //alloca la struttura dati contenente il grafo
 	/*
 	 * Nota: per accedere all'elemento g[i][j]
 	 * bisogna fare g[i*nodes + j]
@@ -282,7 +292,7 @@ GRAPHS load_sparse_single(char* filename, int *n, int *m){
 	 * 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
 	 * TODO: bisogna convertire la matrice da float* a double*
 	 */
-	GRAPHS s = _mm_malloc(nodes*nodes*sizeof(float), 16); //alloca la struttura dati contenente il grafo
+	GRAPHS s = (GRAPHS)_mm_malloc(nodes*nodes*sizeof(float), 16); //alloca la struttura dati contenente il grafo
 	/*
 	 * Anche in questo caso s[i][j] = s[i*nodes + j]
 	 */
@@ -319,8 +329,13 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
  * Prototipo che si riferisce a una funzione presente in
  * un altro file.
  */
-extern void pagerank32(params* input);
+//extern void pagerank32(params* input);
 
+float* get_outdegree_single(int n, float *A);
+float* get_matrix_P_single(int n, float *A, float *d);
+
+double* get_outdegree_double(int n, double *A);
+double* get_matrix_P_double(int n, double *A, double *d);
 
 /*
  *	pagerank
@@ -339,12 +354,124 @@ void pagerank(params* input) {
     // -------------------------------------------------
     // Codificare qui l'algoritmo risolutivo
     // -------------------------------------------------
-    
-    pagerank32(input); // Esempio di chiamata di funzione assembly
+    /*
+     * 1° step: passare dalla matrice G o S alla matrice P, utilizzando l'outdegree.
+     * In particolare si vuole ottenere prima il vettore degli outdegree e poi imporre:
+     * P[i][j] = (G oppure S)[i][j]/outdegree[i];
+     */
+	//verifica formato sparse single o double
+	//precisione singola
+	if(input->S != NULL){
+		float *d = get_outdegree_single(input->N, input->S);
+		//matrice P
+		float *P = get_matrix_P_single(input->N, input->S, d);
+		/*TEST matrice P
+		Basta sostituire P con input->S per testare la matrice di adiacenza.
+		TODO: Test con grafo di piccole dimensioni.
+		for(int i = 0; i < (input->N); i++){
+			for(int j = 0; j < (input->N); j++){
+				printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
+			}
+		}*/
+	}
+	//precisione doppia
+	else if(input->G != NULL){
+		double *d = get_outdegree_double(input->N, input->G);
+		double *P = get_matrix_P_double(input->N, input->G, d);
+		/*for(int i = 0; i < (input->N); i++){
+			for(int j = 0; j < (input->N); j++){
+				printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
+			}
+		}*/
+	}
+	//verifica formato dense
+	else{
+		/*
+		 * Seconda Parte Algoritmo
+		 */
+	}
+
+    //pagerank32(input); // Esempio di chiamata di funzione assembly
 
     // -------------------------------------------------
 
 }
+
+/*
+ * Descrizione = funzione che calcola il vettore di outdegree
+ * Ingresso = dimesione della matrice A (n), matrice di adiacenza A
+ * Uscita = vettore degli outdegree d
+ */
+
+float* get_outdegree_single(int n, float *A){
+	//vettore di outdegree
+	float *d = (float *)_mm_malloc(n*sizeof(float), 16);
+	for(int i = 0; i < n; i++){
+		int out = 0;
+		for(int j = 0; j < n; j++){
+			/*conta ogni volta che è presente un 1 nella riga i
+			 * corrisponde al numero di archi uscenti da i
+			*/
+			if(A[i*n + j]){
+				out++;
+			}
+		}
+		//inserisce l'outdegree nel vettore d
+		*(d+i) = out;
+	}
+	return d;
+}
+
+double* get_outdegree_double(int n, double *A){
+	//vettore di outdegree
+	double *d = (double *)_mm_malloc(n*sizeof(double), 16);
+	for(int i = 0; i < n; i++){
+		int out = 0;
+		for(int j = 0; j < n; j++){
+			if(A[i*n + j]){
+				out++;
+			}
+		}
+		//inserisce l'outdegree nel vettore
+		*(d+i) = out;
+	}
+	return d;
+}
+
+/*
+ * Descrizione = funzione che ricava la matrice delle probabilità
+ * di transizione P, a partire dal vettore di outdegree (d) e dalla matrice di
+ * adiacenza (A)
+ * Ingresso = dimesione matrice di adiacenza (n), matrice di adiacenza (A)
+ * 				vettore di outdegree (d)
+ * Uscita = matrice delle probabilità di transizione P = A/d
+ */
+
+float* get_matrix_P_single(int n, float *A, float *d){
+	float *P = (float *)_mm_malloc(n*n*sizeof(float), 16);
+	for(int i = 0; i < n; i++){
+		for(int j = 0; j < n; j++){
+			//la verifica serve per evitare divisioni inutili
+			if(A[i*n + j] != 0){
+				P[i*n + j] = A[i*n + j]/d[i];
+			}
+		}
+	}
+	return P;
+}
+
+double* get_matrix_P_double(int n, double *A, double *d){
+	double *P = (double *)_mm_malloc(n*n*sizeof(double), 16);
+	for(int i = 0; i < n; i++){
+		for(int j = 0; j < n; j++){
+			if(A[i*n + j] != 0){
+				P[i*n + j] = A[i*n + j]/d[i];
+			}
+		}
+	}
+	return P;
+}
+
 
 
 #define	SPARSE	0
@@ -353,8 +480,6 @@ void pagerank(params* input) {
 #define	DOUBLE	1
 #define	NOPT	0
 #define	OPT		1
-
-
 
 int main(int argc, char** argv) {
 	
@@ -474,7 +599,7 @@ int main(int argc, char** argv) {
 	else
 		printf("%.3f\n", ((float)t)/CLOCKS_PER_SEC);
 			
-	if (input->pagerank != NULL)
+	/*if (input->pagerank != NULL)
 	{
 		if (!input->silent && input->display) {
 			printf("\nPageRanks:\n");
@@ -483,7 +608,7 @@ int main(int argc, char** argv) {
 			}
 		}
 		save_pageranks(input->file_name, input->N, input->pagerank);
-	}
+	}*/
 	
 	return 0;
 }
