@@ -334,10 +334,20 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 float* get_outdegree_single(int n, float *A);
 float* get_matrix_P_single(int n, float *A, float *d);
 void get_matrix_P_primo_single(int n, float *P, float *d);
+float* get_matriceTeletrasporto_single(int n, float *v);
+void get_matrix_P_secondo_single(int n, float *P, float *E, double c);
+float* getVectorPiIn_single(int n, float *v);
+float* get_v_single(int n);
+double* getPagerank_single(float *Pi0, float *P, double eps, int n);
 
 double* get_outdegree_double(int n, double *A);
 double* get_matrix_P_double(int n, double *A, double *d);
 void get_matrix_P_primo_double(int n, double *P, double *d);
+double* get_matriceTeletrasporto_double(int n, double *v);
+void get_matrix_P_secondo_double(int n, double *P, double *E, double c);
+double* getVectorPiIn_double(int n, double *v);
+double* get_v_double(int n);
+double* getPagerank_double(double *Pi0, double *P, double eps, int n);
 
 /*
  *	pagerank
@@ -392,6 +402,11 @@ void pagerank(params* input) {
 		 * nessuna matrice.
 		 */
 		get_matrix_P_primo_single(input->N, P, d);
+		float *v = get_v_single(input->N);
+		float *E = get_matriceTeletrasporto_single(input->N, v);
+		get_matrix_P_secondo_single(input->N, P, E, input->c);
+		float *Pi0 = getVectorPiIn_single(input->N, v);
+		double *Pis = getPagerank_single(Pi0, P, input->eps, input->N);
 		//TODO: 3° step - passare da P' a P'' in precisione singola
 		/*meglio calcolare il pagerank sia qui che nell'altro ramo if
 		 * così da convertire il vettore dei pagerank da float a double
@@ -407,6 +422,14 @@ void pagerank(params* input) {
 			}
 		}*/
 		get_matrix_P_primo_double(input->N, P, d);
+		double *v = get_v_double(input->N);
+		double *E = get_matriceTeletrasporto_double(input->N, v);
+		get_matrix_P_secondo_double(input->N, P, E, input->c);
+		double *Pi0 = getVectorPiIn_double(input->N, v);
+		double *Pis = getPagerank_double(Pi0, P, input->eps, input->N);
+		for(int i = 0; i < (input->N); i++){
+				printf("elemento Pis[%d] = %f\n", i, Pis[i]);
+		}
 		//TODO: 3° step - passare da P' a P'' in precisione doppia
 		/*
 		 * Suggerimento - il codice da P'' al pagerank qui è lo stesso
@@ -419,6 +442,10 @@ void pagerank(params* input) {
 		/*
 		 * Seconda Parte Algoritmo
 		 */
+		double *v = get_v_double(input->N);
+		double *Pi0 = getVectorPiIn_double(input->N, v);
+		double *Pis = getPagerank_double(Pi0, input->P, input->eps, input->N);
+
 	}
 
     //pagerank32(input); // Esempio di chiamata di funzione assembly
@@ -533,6 +560,240 @@ void get_matrix_P_primo_double(int n, double *P, double *d){
 	}
 }
 
+float* get_matriceTeletrasporto_single(int n, float *v){
+/*Dobbiamo ricavare la matrice E detta MATRICE DI TELETRASPORTO;
+	  * E è uguale al prodotto tra i 2 vettori u e v
+	  * vettore riga di personalizzazione -> v=(1/n,1/n,....,1/n)
+	  * u è un vettore colonna i cui elementi sono tutti 1 -> u=(1,1,....,1)^T(trasposto)
+	  * E sarà una matrice con un numero di righe pari agli elementi di u e un numero di colonne
+	  * pari agli elementi di v
+	  * */
+	int* u=(int*)_mm_malloc(n*sizeof(int),16);
+	for (int j=0;j<n;j++){
+		u[j]=1;
+	}
+
+	float* E=(float*)_mm_malloc(n*n*sizeof(float),16);
+		for(int i=0; i<n;i++){
+			for(int j=0;j<n;j++){
+				//TODO: fare il prodotto tra i 2 vettori e salvare ogni risultato nella matrice E
+				E[i*n+j]=u[i]*v[j];
+			}
+		}
+	return E;
+
+}
+
+double* get_matriceTeletrasporto_double(int n, double *v){
+/*Dobbiamo ricavare la matrice E detta MATRICE DI TELETRASPORTO;
+	  * E è uguale al prodotto tra i 2 vettori u e v
+	  * vettore riga di personalizzazione -> v=(1/n,1/n,....,1/n)
+	  * u è un vettore colonna i cui elementi sono tutti 1 -> u=(1,1,....,1)^T(trasposto)
+	  * E sarà una matrice con un numero di righe pari agli elementi di u e un numero di colonne
+	  * pari agli elementi di v
+	  * */
+
+	// int u[1][n];
+	int* u=(int*)_mm_malloc(n*sizeof(int),16);
+	for (int j=0;j<n;j++){
+		u[j]=1;
+	}
+
+	double* E=(double*)_mm_malloc(n*n*sizeof(double),16);
+		for(int i=0; i<n;i++){
+			for(int j=0;j<n;j++){
+				//TODO: fare il prodotto tra i 2 vettori e salvare ogni risultato nella matrice E
+				E[i*n+j]=u[i]*v[j];
+			}
+		}
+	return E;
+
+}
+
+float* get_v_single(int n){
+	float *v = (float*)_mm_malloc(n*sizeof(float),16);
+	for (int i=0; i <n;i++){
+			v[i]=1/(float)n;
+		}
+	return v;
+}
+
+double* get_v_double(int n){
+	double *v = (double*)_mm_malloc(n*sizeof(double),16);
+	for (int i=0; i <n;i++){
+			v[i]=1/(double)n;
+		}
+	return v;
+}
+
+void get_matrix_P_secondo_single(int n, float* P, float* E, double c){
+
+	//float c= rand()/(float)RAND_MAX; <- non va scritto, viene dato da input
+	//float c=0.85;// il parametro deve poter variare
+	/*Andiamo a calcolare P'' a precisione singola seguendo la formula P''=cP'+(1-c)E
+		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
+		 * */
+	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
+
+		for(int i=0; i<n; i++){
+			for(int j=0; j<n; j++){
+				P[i*n+j]=c*P[i*n+j];// P1[i*n+j]=c*P1[i*n+j];
+			}
+		}
+
+		for(int i=0; i<n; i++){
+			for(int j=0; j<n; j++){
+				E[i*n+j]=(1-c)*E[i*n+j];
+			}
+		}
+
+		//sommiamo le 2 matrici risultanti per ottenere P''
+		for (int i=0; i<n; i++){
+			for(int j=0; j<n; j++){
+				P[i*n+j]+=E[i*n+j];
+			}
+		}
+
+}
+
+void get_matrix_P_secondo_double(int n, double* P, double* E, double c){
+	//double c= rand()/(double)RAND_MAX;
+
+	//double c=0.85; il parametro c deve poter variare
+	/*Andiamo a calcolare P'' a precisione singola seguendo la formula P''=cP'+(1-c)E
+		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
+		 * */
+	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
+
+	for(int i=0; i<n; i++){
+		for(int j=0; j<n; j++){
+			P[i*n+j]=c*P[i*n+j];// P1[i*n+j]=c*P1[i*n+j];
+		}
+	}
+
+	for(int i=0; i<n; i++){
+		for(int j=0; j<n; j++){
+			E[i*n+j]=(1-c)*E[i*n+j];
+		}
+	}
+
+	//sommiamo le 2 matrici risultanti per ottenere P''
+	for (int i=0; i<n; i++){
+		for(int j=0; j<n; j++){
+			P[i*n+j]+= E[i*n+j];
+		}
+	}
+
+}
+
+float* getVectorPiIn_single(int n, float *v){
+	float* Pi=(float*)_mm_malloc(sizeof(float)*n,16);
+	for (int i=0; i<n; i++){
+		Pi[i]=v[i];
+	}
+	return Pi;
+}
+double* getVectorPiIn_double(int n, double *v){
+	double* Pi=(double*)_mm_malloc(sizeof(double)*n,16);
+	for (int i=0; i<n; i++){
+		Pi[i]=v[i];
+	}
+	return Pi;
+}
+
+float* getVectorPik_single(float *P, float *Pi0, int n){
+	float *Pik = (float *)_mm_malloc(n*sizeof(float), 16);
+	for(int i = 0; i < n; i++){
+		for(int j = 0; j < n; j++){
+			Pik[i] += P[j*n + i]*Pi0[j];
+		}
+	}
+	return Pik;
+}
+
+double* getVectorPik_double(double *P, double *Pi0, int n){
+	double *Pik = (double *)_mm_malloc(n*sizeof(double), 16);
+	for(int i = 0; i < n; i++){
+		for(int j = 0; j < n; j++){
+			Pik[i] += P[j*n + i]*Pi0[j];
+		}
+	}
+	return Pik;
+}
+
+void getPagrnk_single(int n, float *Pik){
+	float somma;
+	for(int i = 0; i < n; i++)
+		somma += Pik[i];
+	for(int i = 0; i < n; i++)
+		Pik[i] = Pik[i]/somma;
+}
+
+void getPagrnk_double(int n, double *Pik){
+	double somma;
+	for(int i = 0; i < n; i++)
+		somma += Pik[i];
+	for(int i = 0; i < n; i++)
+		Pik[i] = Pik[i]/somma;
+}
+
+
+double* getPagerank_single(float *Pi0, float *P, double eps, int n){
+	char stop = 0;
+	double delta = 0;
+	float *Pik = NULL;
+	while(!stop){
+		Pik = getVectorPik_single(P,Pi0,n);
+		/*
+		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
+		 */
+		for(int i = 0; i < n; i++){
+			delta += Pi0[i]-Pik[i];
+		}
+		/*
+		 * Se il valore delta calcolato è minore di epsilon
+		 * allora siamo arrivati all'iterazione che ci fa ottenere
+		 * il vettore dei pagerank. Altrimenti si aggiorna Pi0 che conterrà
+		 * l'iterazione attuale e si esegue un'altra iterazione.
+		 */
+		if(delta < eps){
+			stop = 1;
+			break;
+		}
+		Pi0 = Pik;
+	}
+	getPagrnk_single(n,Pik);
+	//TODO conversione a double di Pik
+	return NULL;
+}
+
+double* getPagerank_double(double *Pi0, double *P, double eps, int n){
+	char stop = 0;
+	double delta = 0;
+	double *Pik = NULL;
+	while(!stop){
+		Pik = getVectorPik_double(P,Pi0,n);
+		/*
+		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
+		 */
+		for(int i = 0; i < n; i++){
+			delta += Pi0[i]-Pik[i];
+		}
+		/*
+		 * Se il valore delta calcolato è minore di epsilon
+		 * allora siamo arrivati all'iterazione che ci fa ottenere
+		 * il vettore dei pagerank. Altrimenti si aggiorna Pi0 che conterrà
+		 * l'iterazione attuale e si esegue un'altra iterazione.
+		 */
+		if(delta < eps){
+			stop = 1;
+			break;
+		}
+		Pi0 = Pik;
+	}
+	getPagrnk_double(n,Pik);
+	return Pik;
+}
 
 
 #define	SPARSE	0
