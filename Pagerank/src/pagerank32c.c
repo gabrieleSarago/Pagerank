@@ -311,7 +311,7 @@ GRAPHS load_sparse_single(char* filename, int *n, int *m){
 		status = fread(&sorg, sizeof(int), 1, fp);
 		status = fread(&dest, sizeof(int), 1, fp);
 		// aggiungi l'arco (sorg,dest) a s
-		s[sorg*nodes + dest] = 1;
+		s[(sorg-1)*nodes + (dest-1)] = 1;
 	}
 	fclose(fp);
 
@@ -385,30 +385,11 @@ void pagerank(params* input) {
 	//verifica formato sparse single o double
 	//precisione singola
 	if(input->S != NULL){
-		/*int a,b;
-		int k = 0;
-		for(int i = 0; i < input->N; i++){
-			for(int j = 0; j < input->N; j++){
-				if(input->S[i*(input->N) + j] != 0){
-					printf("Elemento s[%d][%d] = %f\n",i, j, input->S[i*(input->N) + j]);
-					a = i;
-					b = j;
-					k = 1;
-					break;
-				}
-			}
-			if(k)break;
-		}*/
 		float *d = get_outdegree_single(input->N, input->S);
-		//printf("Elemento d[%d] = %f\n",a,d[a]);
 		//matrice P
 		float *P = get_matrix_P_single(input->N, input->S, d);
-		//printf("S[%d][%d]\\d[%d] = %f\n",a, b, a, P[a*input->N +b]);
-		//float y = 1/(float)input->N;
-		//printf("1\\%d = %f\n",(input->N), y);
 		/*TEST matrice P
 		Basta sostituire P con input->S per testare la matrice di adiacenza.
-		TODO: Test con grafo di piccole dimensioni.
 		for(int i = 0; i < (input->N); i++){
 			for(int j = 0; j < (input->N); j++){
 				printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
@@ -431,29 +412,15 @@ void pagerank(params* input) {
 		 * nessuna matrice.
 		 */
 		get_matrix_P_primo_single(input->N, P, d);
-		//printf("P'[%d][%d] = %f\n",a, b, P[a*input->N +b]);
 		float *v = get_v_single(input->N);
 		float *E = get_matriceTeletrasporto_single(input->N, v);
 		get_matrix_P_secondo_single(input->N, P, E, input->c);
-		//printf("P''[%d][%d] = %f\n",a, b, P[a*input->N +b]);
-		/*float *z = _mm_malloc(input->N*sizeof(float), 16);
-		float prod = 0;
-		for(int i = 0; i < input->N; i++){
-			z[i] = P[i*input->N];
-			prod += z[i]*y;
-			//printf("P''[%d][0] = %f\n", i, z[i]);
-		}*/
-		//printf("Pagerank Pi0[0] = %f",prod);
-
 		float *Pi0 = getVectorPiIn_single(input->N, v);
 		input->pagerank = getPagerank_single(Pi0, P, input->eps, input->N);
-		//TODO: 3° step - passare da P' a P'' in precisione singola
-		/*meglio calcolare il pagerank sia qui che nell'altro ramo if
-		 * così da convertire il vettore dei pagerank da float a double
-		 */
 	}
 	//precisione doppia
 	else if(input->G != NULL){
+		//TEST con grafo di piccole dimensioni
 		/*input->N = 4;
 		input->M = 6;
 		double m[4][4] = {{0,1,1,1},
@@ -461,17 +428,13 @@ void pagerank(params* input) {
 						  {0,0,0,0},
 						  {1,0,0,0}};
 		input->G = (double *) m;*/
-		//printf("elemento G[2317][2306] = %f\n", input->G[2317*(input->N)+2306]);
 		double *d = get_outdegree_double(input->N, input->G);
-		//for(int i = 0; i < input->N; i++){
-			//printf("d[2317] = %.14f\n", d[2317]);
-		//}
 		double *P = get_matrix_P_double(input->N, input->G, d);
 		/*for(int i = 0; i < (input->N); i++){
 			for(int j = 0; j < (input->N); j++){
-				if(P[i*(input->N)+j] != 0){*/
-					//printf("elemento P[2317][2306] = %f\n", P[2317*(input->N)+2306]);
-				/*}
+				if(P[i*(input->N)+j] != 0){
+					printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
+				}
 			}
 		}*/
 		get_matrix_P_primo_double(input->N, P, d);
@@ -482,7 +445,6 @@ void pagerank(params* input) {
 				}
 			}
 		}*/
-		//printf("elemento P'[2317][2306] = %f\n", P[2317*(input->N)+2306]);
 		double *v = get_v_double(input->N);
 		double *E = get_matriceTeletrasporto_double(input->N, v);
 		get_matrix_P_secondo_double(input->N, P, E, input->c);
@@ -491,29 +453,14 @@ void pagerank(params* input) {
 				printf("elemento P''[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
 			}
 		}*/
-		//printf("elemento P''[2317][2306] = %f\n", P[2317*(input->N)+2306]);
 		double *Pi0 = getVectorPiIn_double(input->N, v);
 		input->pagerank = getPagerank_double(Pi0, P, input->eps, input->N);
-		/*for(int i = 0; i < (input->N); i++){
-			printf("elemento Pis[%d] = %f\n", i, input->pagerank[i]);
-		}*
-		//TODO: 3° step - passare da P' a P'' in precisione doppia
-		/*
-		 * Suggerimento - il codice da P'' al pagerank qui è lo stesso
-		 * del codice nel ramo else, quindi si potrebbe usare una sola funzione
-		 * da chiamare in tutte e due le parti.
-		 */
 	}
 	//verifica formato dense
 	else{
 		/*
 		 * Seconda Parte Algoritmo
 		 */
-		/*for(int i = 0; i < (input->N); i++){
-					for(int j = 0; j < (input->N); j++){
-						printf("elemento P''[%d][%d] = %f\n", i, j, input->P[i*(input->N)+j]);
-					}
-				}*/
 		double *v = get_v_double(input->N);
 		double *Pi0 = getVectorPiIn_double(input->N, v);
 		input->pagerank = getPagerank_double(Pi0, input->P, input->eps, input->N);
@@ -648,7 +595,6 @@ float* get_matriceTeletrasporto_single(int n, float *v){
 	float* E=(float*)_mm_malloc(n*n*sizeof(float),16);
 		for(int i=0; i<n;i++){
 			for(int j=0;j<n;j++){
-				//TODO: fare il prodotto tra i 2 vettori e salvare ogni risultato nella matrice E
 				E[i*n+j]=u[i]*v[j];
 			}
 		}
@@ -674,7 +620,6 @@ double* get_matriceTeletrasporto_double(int n, double *v){
 	double* E=(double*)_mm_malloc(n*n*sizeof(double),16);
 		for(int i=0; i<n;i++){
 			for(int j=0;j<n;j++){
-				//TODO: fare il prodotto tra i 2 vettori e salvare ogni risultato nella matrice E
 				E[i*n+j]=u[i]*v[j];
 			}
 		}
@@ -788,7 +733,6 @@ void getVectorPik_double(double *P, double *Pi0, double *Pik, int n){
 		for(int j = 0; j < n; j++){
 			Pik[i] += P[j*n + i]*Pi0[j];
 		}
-		//printf("Pik[%d] = %.14f\n",i,Pik[i]);
 	}
 }
 
