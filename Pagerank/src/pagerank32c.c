@@ -346,8 +346,8 @@ float* get_outdegree_single(int n, float *A);
 float* get_matrix_P_single(int n, float *A, float *d);
 void get_matrix_P_primo_single(int n, float *P, float *d);
 float* get_matriceTeletrasporto_single(int n, float *v);
-void get_matrix_P_secondo_single(int n, float *P, float *E, double c);
-float* getVectorPiIn_single(int n, float *v);
+void get_matrix_P_secondo_single(int n, float *P, double c);
+float* getVectorPiIn_single(int n, float e);
 float* get_v_single(int n);
 double* getPagerank_single(float *Pi0, float *P, double eps, int n);
 
@@ -355,8 +355,8 @@ double* get_outdegree_double(int n, double *A);
 double* get_matrix_P_double(int n, double *A, double *d);
 void get_matrix_P_primo_double(int n, double *P, double *d);
 double* get_matriceTeletrasporto_double(int n, double *v);
-void get_matrix_P_secondo_double(int n, double *P, double *E, double c);
-double* getVectorPiIn_double(int n, double *v);
+void get_matrix_P_secondo_double(int n, double *P, double c);
+double* getVectorPiIn_double(int n, double e);
 double* get_v_double(int n);
 double* getPagerank_double(double *Pi0, double *P, double eps, int n);
 
@@ -411,11 +411,12 @@ void pagerank(params* input) {
 		 * ottenuta modificando la matrice P, per questo motivo la seguente funzione non restituisce
 		 * nessuna matrice.
 		 */
+		float e = 1/(float)input->N;
 		get_matrix_P_primo_single(input->N, P, d);
-		float *v = get_v_single(input->N);
-		float *E = get_matriceTeletrasporto_single(input->N, v);
-		get_matrix_P_secondo_single(input->N, P, E, input->c);
-		float *Pi0 = getVectorPiIn_single(input->N, v);
+		//float *v = get_v_single(input->N);
+		//float *E = get_matriceTeletrasporto_single(input->N, v);
+		get_matrix_P_secondo_single(input->N, P, input->c);
+		float *Pi0 = getVectorPiIn_single(input->N, e);
 		input->pagerank = getPagerank_single(Pi0, P, input->eps, input->N);
 	}
 	//precisione doppia
@@ -437,6 +438,7 @@ void pagerank(params* input) {
 				}
 			}
 		}*/
+		double e = 1/(double)input->N;
 		get_matrix_P_primo_double(input->N, P, d);
 		/*for(int i = 0; i < (input->N); i++){
 			for(int j = 0; j < (input->N); j++){
@@ -445,15 +447,15 @@ void pagerank(params* input) {
 				}
 			}
 		}*/
-		double *v = get_v_double(input->N);
-		double *E = get_matriceTeletrasporto_double(input->N, v);
-		get_matrix_P_secondo_double(input->N, P, E, input->c);
+		//double *v = get_v_double(input->N);
+		//double *E = get_matriceTeletrasporto_double(input->N, v);
+		get_matrix_P_secondo_double(input->N, P, input->c);
 		/*for(int i = 0; i < (input->N); i++){
 			for(int j = 0; j < (input->N); j++){
 				printf("elemento P''[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
 			}
 		}*/
-		double *Pi0 = getVectorPiIn_double(input->N, v);
+		double *Pi0 = getVectorPiIn_double(input->N, e);
 		input->pagerank = getPagerank_double(Pi0, P, input->eps, input->N);
 	}
 	//verifica formato dense
@@ -461,8 +463,9 @@ void pagerank(params* input) {
 		/*
 		 * Seconda Parte Algoritmo
 		 */
-		double *v = get_v_double(input->N);
-		double *Pi0 = getVectorPiIn_double(input->N, v);
+		//double *v = get_v_double(input->N);
+		double e = 1/(double)input->N;
+		double *Pi0 = getVectorPiIn_double(input->N, e);
 		input->pagerank = getPagerank_double(Pi0, input->P, input->eps, input->N);
 
 	}
@@ -643,7 +646,7 @@ double* get_v_double(int n){
 	return v;
 }
 
-void get_matrix_P_secondo_single(int n, float* P, float* E, double c){
+void get_matrix_P_secondo_single(int n, float* P, double c){
 
 	//float c= rand()/(float)RAND_MAX; <- non va scritto, viene dato da input
 	//float c=0.85;// il parametro deve poter variare
@@ -652,28 +655,15 @@ void get_matrix_P_secondo_single(int n, float* P, float* E, double c){
 		 * */
 	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
 
-		for(int i=0; i<n; i++){
-			for(int j=0; j<n; j++){
-				P[i*n+j]=c*P[i*n+j];// P1[i*n+j]=c*P1[i*n+j];
-			}
+	float e = (1-c)*(1/(float)n);
+	for(int i=0; i<n; i++){
+		for(int j=0; j<n; j++){
+			P[i*n+j]=c*P[i*n+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
 		}
-
-		for(int i=0; i<n; i++){
-			for(int j=0; j<n; j++){
-				E[i*n+j]=(1-c)*E[i*n+j];
-			}
-		}
-
-		//sommiamo le 2 matrici risultanti per ottenere P''
-		for (int i=0; i<n; i++){
-			for(int j=0; j<n; j++){
-				P[i*n+j]+=E[i*n+j];
-			}
-		}
-
+	}
 }
 
-void get_matrix_P_secondo_double(int n, double* P, double* E, double c){
+void get_matrix_P_secondo_double(int n, double* P, double c){
 	//double c= rand()/(double)RAND_MAX;
 
 	//double c=0.85; il parametro c deve poter variare
@@ -681,39 +671,26 @@ void get_matrix_P_secondo_double(int n, double* P, double* E, double c){
 		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
 		 * */
 	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
+	double e = (1-c)*(1/(double)n);
 	for(int i=0; i<n; i++){
 		for(int j=0; j<n; j++){
-			P[i*n+j]=c*P[i*n+j];// P1[i*n+j]=c*P1[i*n+j];
-		}
-	}
-
-	for(int i=0; i<n; i++){
-		for(int j=0; j<n; j++){
-			E[i*n+j]=(1-c)*E[i*n+j];
-			//printf("(1-c)*E[%d][%d] = %.14f\n",i,j,E[i*n+j]);
-		}
-	}
-
-	//sommiamo le 2 matrici risultanti per ottenere P''
-	for (int i=0; i<n; i++){
-		for(int j=0; j<n; j++){
-			P[i*n+j]+= E[i*n+j];
+			P[i*n+j]=c*P[i*n+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
 		}
 	}
 }
 
-float* getVectorPiIn_single(int n, float *v){
+float* getVectorPiIn_single(int n, float e){
 	float* Pi=(float*)_mm_malloc(sizeof(float)*n,16);
 	for (int i=0; i<n; i++){
-		Pi[i]=v[i];
+		Pi[i]=e;
 	}
 	return Pi;
 }
 
-double* getVectorPiIn_double(int n, double *v){
+double* getVectorPiIn_double(int n, double e){
 	double* Pi=(double*)_mm_malloc(sizeof(double)*n,16);
 	for (int i=0; i<n; i++){
-		Pi[i]=v[i];
+		Pi[i]=e;
 	}
 	return Pi;
 }
@@ -766,7 +743,7 @@ double* getPagerank_single(float *Pi0, float *P, double eps, int n){
 		for(int i = 0; i < n; i++){
 			delta += fabsf(Pi0[i]-Pik[i]);
 		}
-		printf("delta = %f\n", delta);
+		//printf("delta = %f\n", delta);
 		/*
 		 * Se il valore delta calcolato è minore di epsilon
 		 * allora siamo arrivati all'iterazione che ci fa ottenere
