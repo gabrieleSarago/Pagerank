@@ -86,6 +86,7 @@ typedef struct {
 	GRAPHS S; // codifica sparse single
 	int N; // numero di nodi
 	int M; // numero di archi
+	int O;
 	double c; // default=0.85
 	double eps; // default=1e-5
 	int format; // 0=sparse, 1=full
@@ -167,7 +168,7 @@ void dealloc_matrix(MATRIX mat) {
  *****************************************************************************
  * 
  */
-MATRIX load_dense(char* filename, int *n, int *m) {	
+MATRIX load_dense(char* filename, int *n, int *m, int *o) {
 	FILE* fp;
 	int rows, cols, status, i;
 	char fpath[256];
@@ -189,7 +190,14 @@ MATRIX load_dense(char* filename, int *n, int *m) {
 	*/
 	status = fread(&rows, sizeof(int), 1, fp);
 	status = fread(&cols, sizeof(int), 1, fp);
-
+	*o = 0;
+	if(cols % 16 != 0){
+		int a = cols/16;
+		a = a*16;
+		int b = cols-a;
+		*o = 16-b;
+		cols+=*o;
+	}
 	MATRIX data = alloc_matrix(rows,cols);
 	//Salva la matrice (in precisione doppia) nel blocco di memoria puntato da data
 	status = fread(data, sizeof(double), rows*cols, fp);
@@ -199,8 +207,8 @@ MATRIX load_dense(char* filename, int *n, int *m) {
 	//salva le dimensioni della matrice in n ed m
 	*n = rows;
 	//dovrebbe essere *m = cols;
-	*m = cols; //(?)
-	
+	*m = rows*cols; //(?)
+
 	return data;
 }
 
@@ -217,7 +225,7 @@ MATRIX load_dense(char* filename, int *n, int *m) {
  * 	successivi M*2*4 byte: M archi rappresentati come coppie (i,j) di interi a 32 bit 
  * 
  */
-GRAPHD load_sparse_double(char* filename, int *n, int *m) {
+GRAPHD load_sparse_double(char* filename, int *n, int *m, int *o) {
 	FILE* fp;
 	int nodes, arcs, status, i;
 	char fpath[256];
@@ -234,13 +242,22 @@ GRAPHD load_sparse_double(char* filename, int *n, int *m) {
 	status = fread(&nodes, sizeof(int), 1, fp);
 	status = fread(&arcs, sizeof(int), 1, fp);
 
+	*o = 0;
+	int cols = nodes;
+	if(nodes % 16 != 0){
+		int a = nodes/16;
+		a = a*16;
+		int b = nodes-a;
+		*o = 16-b;
+		cols+=*o;
+	}
 	/*
 	 * Matrice di adiacenza n*n, dove n è il numero di nodi
 	 * il puntatore g punta a un blocco di memoria di nodes*nodes elementi
 	 * dove ogni elemento occupa 8 byte. In questo momento la matrice contiene solo
 	 * 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
 	 */
-	GRAPHD g = (GRAPHD)_mm_malloc(nodes*nodes*sizeof(double),16); //alloca la struttura dati contenente il grafo
+	GRAPHD g = (GRAPHD)_mm_malloc(nodes*cols*sizeof(double),16); //alloca la struttura dati contenente il grafo
 	/*
 	 * Nota: per accedere all'elemento g[i][j]
 	 * bisogna fare g[i*nodes + j]
@@ -264,8 +281,7 @@ GRAPHD load_sparse_double(char* filename, int *n, int *m) {
 			printf("Trovato! dest = %d\n",dest);
 		}*/
 		//printf("sorg = %d dest = %d\n", sorg, dest);
-
-		g[(sorg-1)*nodes + (dest-1)] = 1;
+		g[(sorg -1)*(nodes + *o) + (dest-1)] = 1;
 	}
 
 	fclose(fp);
@@ -279,7 +295,7 @@ GRAPHD load_sparse_double(char* filename, int *n, int *m) {
  * Versione a precisione singola
  */
 
-GRAPHS load_sparse_single(char* filename, int *n, int *m){
+GRAPHS load_sparse_single(char* filename, int *n, int *m, int *o){
 	FILE* fp;
 	int nodes, arcs, status, i;
 	char fpath[256];
@@ -303,7 +319,16 @@ GRAPHS load_sparse_single(char* filename, int *n, int *m){
 	 * 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
 	 * TODO: bisogna convertire la matrice da float* a double*
 	 */
-	GRAPHS s = (GRAPHS)_mm_malloc(nodes*nodes*sizeof(float), 16); //alloca la struttura dati contenente il grafo
+	*o = 0;
+	int cols = nodes;
+	if(nodes % 16 != 0){
+		int a = nodes/16;
+		a = a*16;
+		int b = nodes-a;
+		*o = 16-b;
+		cols+=*o;
+	}
+	GRAPHS s = (GRAPHS)_mm_malloc(nodes*cols*sizeof(float), 16); //alloca la struttura dati contenente il grafo
 	/*
 	 * Anche in questo caso s[i][j] = s[i*nodes + j]
 	 */
@@ -311,7 +336,7 @@ GRAPHS load_sparse_single(char* filename, int *n, int *m){
 		status = fread(&sorg, sizeof(int), 1, fp);
 		status = fread(&dest, sizeof(int), 1, fp);
 		// aggiungi l'arco (sorg,dest) a s
-		s[(sorg-1)*nodes + (dest-1)] = 1;
+		s[(sorg-1)*(nodes+*o) + (dest-1)] = 1;
 	}
 	fclose(fp);
 
@@ -342,20 +367,20 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
  */
 //extern void pagerank32(params* input);
 
-float* get_outdegree_single(int n, float *A);
-float* get_matrix_P_single(int n, float *A, float *d);
-void get_matrix_P_primo_single(int n, float *P, float *d);
+extern void get_outdegree_single(int n, float *A, float* d, int o);
+float* get_matrix_P_single(int n, float *A, float *d, int o);
+void get_matrix_P_primo_single(int n, float *P, float *d, int o);
 float* get_matriceTeletrasporto_single(int n, float *v);
-void get_matrix_P_secondo_single(int n, float *P, double c);
-float* getVectorPiIn_single(int n, float e);
+void get_matrix_P_secondo_single(int n, float *P, double c, int o);
+extern void getVectorPiIn_single(int n, float e, float *Pi);
 float* get_v_single(int n);
-double* getPagerank_single(float *Pi0, float *P, double eps, int n);
+double* getPagerank_single(float *Pi0, float *P, double eps, int n, int o);
 
-double* get_outdegree_double(int n, double *A);
-double* get_matrix_P_double(int n, double *A, double *d);
-void get_matrix_P_primo_double(int n, double *P, double *d);
+double* get_outdegree_double(int n, double *A, int o);
+double* get_matrix_P_double(int n, double *A, double *d, int o);
+void get_matrix_P_primo_double(int n, double *P, double *d, int o);
 double* get_matriceTeletrasporto_double(int n, double *v);
-void get_matrix_P_secondo_double(int n, double *P, double c);
+void get_matrix_P_secondo_double(int n, double *P, double c, int o);
 double* getVectorPiIn_double(int n, double e);
 double* get_v_double(int n);
 double* getPagerank_double(double *Pi0, double *P, double eps, int n);
@@ -385,12 +410,17 @@ void pagerank(params* input) {
 	//verifica formato sparse single o double
 	//precisione singola
 	if(input->S != NULL){
-		float *d = get_outdegree_single(input->N, input->S);
+		float *d = (float *)_mm_malloc(input->N*sizeof(float), 16);
+		//input->S[0] = 1.0;
+		get_outdegree_single(input->N, input->S, d, input->O);
+		/*for(int i = 0; i < input->N; i++){
+			printf("d[%d] = %f\n", i, d[i]);
+		}*/
 		//matrice P
-		float *P = get_matrix_P_single(input->N, input->S, d);
-		/*TEST matrice P
-		Basta sostituire P con input->S per testare la matrice di adiacenza.
-		for(int i = 0; i < (input->N); i++){
+		float *P = get_matrix_P_single(input->N, input->S, d, input->O);
+		//TEST matrice P
+		//Basta sostituire P con input->S per testare la matrice di adiacenza.
+		/*for(int i = 0; i < (input->N); i++){
 			for(int j = 0; j < (input->N); j++){
 				printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
 			}
@@ -412,12 +442,13 @@ void pagerank(params* input) {
 		 * nessuna matrice.
 		 */
 		float e = 1/(float)input->N;
-		get_matrix_P_primo_single(input->N, P, d);
+		get_matrix_P_primo_single(input->N, P, d, input->O);
 		//float *v = get_v_single(input->N);
 		//float *E = get_matriceTeletrasporto_single(input->N, v);
-		get_matrix_P_secondo_single(input->N, P, input->c);
-		float *Pi0 = getVectorPiIn_single(input->N, e);
-		input->pagerank = getPagerank_single(Pi0, P, input->eps, input->N);
+		get_matrix_P_secondo_single(input->N, P, input->c, input->O);
+		float* Pi0 =(float*)_mm_malloc(sizeof(float)*(input->N+input->O),16);
+		getVectorPiIn_single(input->N, e, Pi0);
+		input->pagerank = getPagerank_single(Pi0, P, input->eps, input->N, input->O);
 	}
 	//precisione doppia
 	else if(input->G != NULL){
@@ -429,8 +460,8 @@ void pagerank(params* input) {
 						  {0,0,0,0},
 						  {1,0,0,0}};
 		input->G = (double *) m;*/
-		double *d = get_outdegree_double(input->N, input->G);
-		double *P = get_matrix_P_double(input->N, input->G, d);
+		double *d = get_outdegree_double(input->N, input->G, input->O);
+		double *P = get_matrix_P_double(input->N, input->G, d, input->O);
 		/*for(int i = 0; i < (input->N); i++){
 			for(int j = 0; j < (input->N); j++){
 				if(P[i*(input->N)+j] != 0){
@@ -439,7 +470,7 @@ void pagerank(params* input) {
 			}
 		}*/
 		double e = 1/(double)input->N;
-		get_matrix_P_primo_double(input->N, P, d);
+		get_matrix_P_primo_double(input->N, P, d, input->O);
 		/*for(int i = 0; i < (input->N); i++){
 			for(int j = 0; j < (input->N); j++){
 				if(P[i*(input->N)+j] != 0){
@@ -449,7 +480,7 @@ void pagerank(params* input) {
 		}*/
 		//double *v = get_v_double(input->N);
 		//double *E = get_matriceTeletrasporto_double(input->N, v);
-		get_matrix_P_secondo_double(input->N, P, input->c);
+		get_matrix_P_secondo_double(input->N, P, input->c, input->O);
 		/*for(int i = 0; i < (input->N); i++){
 			for(int j = 0; j < (input->N); j++){
 				printf("elemento P''[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
@@ -467,7 +498,6 @@ void pagerank(params* input) {
 		double e = 1/(double)input->N;
 		double *Pi0 = getVectorPiIn_double(input->N, e);
 		input->pagerank = getPagerank_double(Pi0, input->P, input->eps, input->N);
-
 	}
 
     //pagerank32(input); // Esempio di chiamata di funzione assembly
@@ -482,32 +512,30 @@ void pagerank(params* input) {
  * Uscita = vettore degli outdegree d
  */
 
-float* get_outdegree_single(int n, float *A){
+/*void get_outdegree_single(int n, float *A, float *d, int o){
 	//vettore di outdegree
-	float *d = (float *)_mm_malloc(n*sizeof(float), 16);
 	for(int i = 0; i < n; i++){
 		int out = 0;
 		for(int j = 0; j < n; j++){
 			/*conta ogni volta che è presente un 1 nella riga i
 			 * corrisponde al numero di archi uscenti da i
 			*/
-			if(A[i*n + j]){
+			/*if(A[i*(n+o) + j]){
 				out++;
 			}
 		}
 		//inserisce l'outdegree nel vettore d
 		*(d+i) = out;
 	}
-	return d;
-}
+}*/
 
-double* get_outdegree_double(int n, double *A){
+double* get_outdegree_double(int n, double *A, int o){
 	//vettore di outdegree
 	double *d = (double *)_mm_malloc(n*sizeof(double), 16);
 	for(int i = 0; i < n; i++){
 		int out = 0;
 		for(int j = 0; j < n; j++){
-			if(A[i*n + j]){
+			if(A[i*(n+o) + j]){
 				out++;
 			}
 		}
@@ -526,25 +554,25 @@ double* get_outdegree_double(int n, double *A){
  * Uscita = matrice delle probabilità di transizione P = A/d
  */
 
-float* get_matrix_P_single(int n, float *A, float *d){
-	float *P = (float *)_mm_malloc(n*n*sizeof(float), 16);
+float* get_matrix_P_single(int n, float *A, float *d, int o){
+	float *P = (float *)_mm_malloc(n*(n+o)*sizeof(float), 16);
 	for(int i = 0; i < n; i++){
 		for(int j = 0; j < n; j++){
 			//la verifica serve per evitare divisioni inutili
-			if(A[i*n + j] != 0){
-				P[i*n + j] = A[i*n + j]/d[i];
+			if(A[i*(n+o) + j] != 0){
+				P[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
 			}
 		}
 	}
 	return P;
 }
 
-double* get_matrix_P_double(int n, double *A, double *d){
-	double *P = (double *)_mm_malloc(n*n*sizeof(double), 16);
+double* get_matrix_P_double(int n, double *A, double *d, int o){
+	double *P = (double *)_mm_malloc(n*(n+o)*sizeof(double), 16);
 	for(int i = 0; i < n; i++){
 		for(int j = 0; j < n; j++){
-			if(A[i*n + j] != 0){
-				P[i*n + j] = A[i*n + j]/d[i];
+			if(A[i*(n+o) + j] != 0){
+				P[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
 			}
 		}
 	}
@@ -559,24 +587,24 @@ double* get_matrix_P_double(int n, double *A, double *d){
  * Post-Condizione = Matrice di transizione P valida
  */
 
-void get_matrix_P_primo_single(int n, float *P, float *d){
+void get_matrix_P_primo_single(int n, float *P, float *d, int o){
 	//verifica i nodi "i" che non hanno link di uscita
 	for(int i = 0; i < n; i++){
 		//se l'outdegree è nullo sostituisce la riga con v
 		if(d[i] == 0){
 			for(int j = 0; j < n; j++){
-				P[i*n + j] = 1/(float)n;
+				P[i*(n+o) + j] = 1/(float)n;
 			}
 		}
 	}
 }
 
-void get_matrix_P_primo_double(int n, double *P, double *d){
+void get_matrix_P_primo_double(int n, double *P, double *d, int o){
 	//verifica i nodi "i" che non hanno link di uscita
 	for(int i = 0; i < n; i++){
 		if(d[i] == 0){
 			for(int j = 0; j < n; j++){
-				P[i*n + j] = 1/(double)n;
+				P[i*(n+o) + j] = 1/(double)n;
 			}
 		}
 	}
@@ -646,7 +674,7 @@ double* get_v_double(int n){
 	return v;
 }
 
-void get_matrix_P_secondo_single(int n, float* P, double c){
+void get_matrix_P_secondo_single(int n, float* P, double c, int o){
 
 	//float c= rand()/(float)RAND_MAX; <- non va scritto, viene dato da input
 	//float c=0.85;// il parametro deve poter variare
@@ -658,12 +686,12 @@ void get_matrix_P_secondo_single(int n, float* P, double c){
 	float e = (1-c)*(1/(float)n);
 	for(int i=0; i<n; i++){
 		for(int j=0; j<n; j++){
-			P[i*n+j]=c*P[i*n+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
+			P[i*(n+o)+j]=c*P[i*(n+o)+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
 		}
 	}
 }
 
-void get_matrix_P_secondo_double(int n, double* P, double c){
+void get_matrix_P_secondo_double(int n, double* P, double c, int o){
 	//double c= rand()/(double)RAND_MAX;
 
 	//double c=0.85; il parametro c deve poter variare
@@ -674,18 +702,16 @@ void get_matrix_P_secondo_double(int n, double* P, double c){
 	double e = (1-c)*(1/(double)n);
 	for(int i=0; i<n; i++){
 		for(int j=0; j<n; j++){
-			P[i*n+j]=c*P[i*n+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
+			P[i*(n+o)+j]=c*P[i*(n+o)+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
 		}
 	}
 }
 
-float* getVectorPiIn_single(int n, float e){
-	float* Pi=(float*)_mm_malloc(sizeof(float)*n,16);
+/*void getVectorPiIn_single(int n, float e, float *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
-	return Pi;
-}
+}*/
 
 double* getVectorPiIn_double(int n, double e){
 	double* Pi=(double*)_mm_malloc(sizeof(double)*n,16);
@@ -695,11 +721,11 @@ double* getVectorPiIn_double(int n, double e){
 	return Pi;
 }
 
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n){
+void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
-			Pik[i] += P[j*n + i]*Pi0[j];
+			Pik[i] += P[j*(n+o) + i]*Pi0[j];
 		}
 	}
 }
@@ -730,12 +756,12 @@ void getPagrnk_double(int n, double *Pik){
 }
 
 
-double* getPagerank_single(float *Pi0, float *P, double eps, int n){
+double* getPagerank_single(float *Pi0, float *P, double eps, int n, int o){
 	int stop = 0;
 	float delta = 0;
 	float *Pik = (float *)_mm_malloc(n*sizeof(float), 16);
 	while(!stop){
-		getVectorPik_single(P, Pi0, Pik, n);
+		getVectorPik_single(P, Pi0, Pik, n, o);
 		/*
 		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 		 */
@@ -904,12 +930,12 @@ int main(int argc, char** argv) {
 	
 	if (input->format == 0){
 		if(input->prec == SINGLE)
-			input->S = load_sparse_single(input->file_name, &input->N, &input->M);
+			input->S = load_sparse_single(input->file_name, &input->N, &input->M, &input->O);
 		else
-			input->G = load_sparse_double(input->file_name, &input->N, &input->M);
+			input->G = load_sparse_double(input->file_name, &input->N, &input->M, &input->O);
 	}
 	else
-		input->P = load_dense(input->file_name, &input->N, &input->M);
+		input->P = load_dense(input->file_name, &input->N, &input->M, &input->O);
 		
 	if (!input->silent) {
 		printf("Input file name: '%s'\n", input->file_name);
@@ -928,8 +954,7 @@ int main(int argc, char** argv) {
 	else
 		printf("%.3f\n", ((float)t)/CLOCKS_PER_SEC);
 			
-	if (input->pagerank != NULL)
-	{
+	if (input->pagerank != NULL){
 		if (!input->silent && input->display) {
 			printf("\nPageRanks:\n");
 			for (i = 0; i < input->N; i++) {
