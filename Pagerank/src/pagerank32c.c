@@ -375,7 +375,8 @@ void get_matrix_P_secondo_single(int n, float *P, double c, int o);
 extern void getVectorPiIn_single(int n, float e, float *Pi);
 float* get_v_single(int n);
 extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o);
-double* getPagerank_single(float *Pi0, float *P, double eps, int n, int o);
+extern void getPagrnk_single(int n, float *Pik);
+extern double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
 
 double* get_outdegree_double(int n, double *A, int o);
 double* get_matrix_P_double(int n, double *A, double *d, int o);
@@ -449,7 +450,9 @@ void pagerank(params* input) {
 		get_matrix_P_secondo_single(input->N, P, input->c, input->O);
 		float* Pi0 =(float*)_mm_malloc(sizeof(float)*(input->N+input->O),16);
 		getVectorPiIn_single(input->N, e, Pi0);
-		input->pagerank = getPagerank_single(Pi0, P, input->eps, input->N, input->O);
+		float *Pik = (float *)_mm_malloc((input->N+input->O)*sizeof(float), 16);
+		double *Piconv = (double *) _mm_malloc((input->N+input->O)*sizeof(double), 16);
+		input->pagerank = getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->O, Piconv);
 	}
 	//precisione doppia
 	else if(input->G != NULL){
@@ -740,13 +743,13 @@ void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o){
 	}
 }
 
-void getPagrnk_single(int n, float *Pik){
+/*void getPagrnk_single(int n, float *Pik){
 	float somma = 0;
 	for(int i = 0; i < n; i++)
 		somma += fabsf(Pik[i]);
 	for(int i = 0; i < n; i++)
 		Pik[i] = Pik[i]/(float)somma;
-}
+}*/
 
 void getPagrnk_double(int n, double *Pik){
 	double somma = 0;
@@ -757,16 +760,15 @@ void getPagrnk_double(int n, double *Pik){
 }
 
 
-double* getPagerank_single(float *Pi0, float *P, double eps, int n, int o){
+/*double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv){
 	int stop = 0;
 	float delta = 0;
-	float *Pik = (float *)_mm_malloc((n+o)*sizeof(float), 16);
 	while(!stop){
 		getVectorPik_single(P, Pi0, Pik, n, o);
 		/*
 		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 		 */
-		delta = 0;
+		/*delta = 0;
 		for(int i = 0; i < n; i++){
 			delta += fabsf(Pi0[i]-Pik[i]);
 		}
@@ -778,7 +780,7 @@ double* getPagerank_single(float *Pi0, float *P, double eps, int n, int o){
 		 * l'iterazione attuale e si esegue un'altra iterazione.
 		 */
 
-		for(int i = 0; i < n; i++){
+		/*for(int i = 0; i < n; i++){
 			Pi0[i] = Pik[i];
 		}
 		if(delta < eps){
@@ -787,12 +789,11 @@ double* getPagerank_single(float *Pi0, float *P, double eps, int n, int o){
 		}
 	}
 	getPagrnk_single(n,Pik);
-	double *Piconv = (double *) _mm_malloc(n*sizeof(double), 16);
 	for(int i = 0; i < n; i++){
 		Piconv[i] = (double) Pik[i];
 	}
 	return Piconv;
-}
+}*/
 
 double* getPagerank_double(double *Pi0, double *P, double eps, int n, int o){
 	int stop = 0;

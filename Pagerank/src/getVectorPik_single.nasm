@@ -37,7 +37,7 @@ cicloi:
 	jge	fine
 	xorps	xmm0, xmm0		;0->xmm0
 	xorps	xmm1, xmm1
-	movups	[ecx+esi*4], xmm0	;azzera Pik[i...i+p-1]
+	movaps	[ecx+esi*4], xmm0	;azzera Pik[i...i+p-1]
 	xor	edi, edi
 cicloj:
 	cmp	edi, edx
@@ -54,7 +54,7 @@ cicloj:
 	jmp	cicloj
 finecicloi:
 	mov	ecx, [ebp+pik]
-	movups	[ecx+esi*4], xmm1	;salva Pik[i...i+p-1]
+	movaps	[ecx+esi*4], xmm1	;salva Pik[i...i+p-1]
 	add	esi, 4
 	jmp	cicloi
 fine:
