@@ -196,9 +196,8 @@ MATRIX load_dense(char* filename, int *n, int *m, int *o) {
 		cols++;
 		/*int a = cols/2;
 		a = a*2;
-		int b = cols-a;
-		*o = 2-b;
-		cols+=*o;*/
+		int b = cols-a;*/
+		*o = 1;
 	}
 	MATRIX data = alloc_matrix(rows,cols);
 	//Salva la matrice (in precisione doppia) nel blocco di memoria puntato da data
@@ -247,11 +246,12 @@ GRAPHD load_sparse_double(char* filename, int *n, int *m, int *o) {
 	*o = 0;
 	int cols = nodes;
 	//Padding che rende la matrice pari
-	if(nodes % 2 != 0){
+	if(cols % 2 != 0){
 		/*int a = nodes/16;
 		a = a*16;
 		int b = nodes-a;
-		*o = 16-b;*/
+		*/
+		*o = 1;
 		cols++;
 	}
 	/*
@@ -383,13 +383,16 @@ extern void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
 //void cvtPagerank(int n, float *Pik, double *Piconv);
 double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
 
-void get_outdegree_double(int n, double *A, double* d, int o);
+extern void get_outdegree_double(int n, double *A, double* d, int o);
 double* get_matrix_P_double(int n, double *A, double *d, int o);
 void get_matrix_P_primo_double(int n, double *P, double *d, int o);
 double* get_matriceTeletrasporto_double(int n, double *v);
 void get_matrix_P_secondo_double(int n, double *P, double c, int o);
-void getVectorPiIn_double(int n, double e, int o, double *Pi);
+extern void getVectorPiIn_double(int n, double e, int o, double *Pi);
 double* get_v_double(int n);
+extern void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o);
+extern void getPagrnk_double(int n, double *Pik);
+extern void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
 double* getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o);
 
 /*
@@ -543,7 +546,7 @@ void pagerank(params* input) {
 	}
 }*/
 
-void get_outdegree_double(int n, double *A, double *d, int o){
+/*void get_outdegree_double(int n, double *A, double *d, int o){
 	//vettore di outdegree
 	for(int i = 0; i < n; i++){
 		int out = 0;
@@ -555,7 +558,7 @@ void get_outdegree_double(int n, double *A, double *d, int o){
 		//inserisce l'outdegree nel vettore
 		*(d+i) = out;
 	}
-}
+}*/
 
 /*
  * Descrizione = funzione che ricava la matrice delle probabilità
@@ -728,14 +731,15 @@ void get_matrix_P_secondo_double(int n, double* P, double c, int o){
 	}
 }*/
 
-void getVectorPiIn_double(int n, double e, int o, double *Pi){
+/*void getVectorPiIn_double(int n, double e, int o, double *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
+	//Serve in assembly per evitare che ci sia 1/n al posto degli zeri di padding
 	for(int i = 0; i < o; i++){
 		Pi[n+i] = 0;
 	}
-}
+}*/
 
 /*void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o){
 	for(int i = 0; i < n; i++){
@@ -746,14 +750,14 @@ void getVectorPiIn_double(int n, double e, int o, double *Pi){
 	}
 }*/
 
-void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o){
+/*void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
 			Pik[i] += P[j*(n+o) + i]*Pi0[j];
 		}
 	}
-}
+}*/
 
 /*void getPagrnk_single(int n, float *Pik){
 	float somma = 0;
@@ -763,13 +767,13 @@ void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o){
 		Pik[i] = Pik[i]/(float)somma;
 }*/
 
-void getPagrnk_double(int n, double *Pik){
+/*void getPagrnk_double(int n, double *Pik){
 	double somma = 0;
 	for(int i = 0; i < n; i++)
 		somma += fabs(Pik[i]);
 	for(int i = 0; i < n; i++)
 		Pik[i] = Pik[i]/(double)somma;
-}
+}*/
 
 /*void getDelta_single(float *Pi0, float *Pik, int n, float *delta){
 	for(int i = 0; i < n; i++){
@@ -778,12 +782,12 @@ void getPagrnk_double(int n, double *Pik){
 	}
 }*/
 
-void getDelta_double(double *Pi0, double *Pik, int n, double *delta){
+/*void getDelta_double(double *Pi0, double *Pik, int n, double *delta){
 	for(int i = 0; i < n; i++){
 			*delta += fabs(Pi0[i]-Pik[i]);
 			Pi0[i] = Pik[i];
 	}
-}
+}*/
 
 void cvtPagerank(int n, float *Pik, double *Piconv){
 	for(int i = 0; i < n; i++){

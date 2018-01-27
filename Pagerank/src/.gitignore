@@ -5,3 +5,8 @@
 /getVectorPiIn_single.o
 /getVectorPik_single.o
 /pg
+/get_outdegree_double.o
+/getDelta_double.o
+/getPagrnk_double.o
+/getVectorPiIn_double.o
+/getVectorPik_double.o

@@ -11,11 +11,11 @@ section	.data
 	align	16
 	d	equ	20
 	align	16
-	m	dd	0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff
+	m	dq	0x7fffffffffffffff, 0x7fffffffffffffff
 
 section	.text
-	global	getDelta_single
-getDelta_single:
+	global	getDelta_double
+getDelta_double:
 	push	ebp
 	mov	ebp, esp
 	pushad
@@ -24,22 +24,21 @@ getDelta_single:
 	mov	edi, [ebp+n]
 	mov	eax, [ebp+d]
 	xor	esi, esi
-	xorps	xmm0, xmm0
+	xorpd	xmm0, xmm0
 cicloi:
 	cmp	esi, edi
 	jge	finecicloi
-	movaps	xmm1, [ebx+esi*4]
-	movaps	xmm2, [ecx+esi*4]
-	subps	xmm1, xmm2
-	andps	xmm1, [m]
-	haddps	xmm1, xmm1
-	haddps	xmm1, xmm1
-	addss	xmm0, xmm1
-	movaps	[ebx+esi*4], xmm2		;Pi0[i...i+p-1] = Pik[i...i+p-1]
-	add	esi, 4
+	movapd	xmm1, [ebx+esi*8]
+	movapd	xmm2, [ecx+esi*8]
+	subpd	xmm1, xmm2
+	andpd	xmm1, [m]
+	haddpd	xmm1, xmm1
+	addsd	xmm0, xmm1
+	movapd	[ebx+esi*8], xmm2		;Pi0[i...i+p-1] = Pik[i...i+p-1]
+	add	esi, 2
 	jmp	cicloi
 finecicloi:
-	movss	[eax], xmm0
+	movsd	[eax], xmm0
 	popad
 	mov	esp, ebp
 	pop	ebp
