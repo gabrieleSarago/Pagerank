@@ -7,7 +7,7 @@ section .data
 	align	16
 	pik	equ	12
 	align	16
-	m	dd	0x7fffffff
+	m	dd	0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff
 
 section .text
 	global	getPagrnk_single
@@ -18,8 +18,7 @@ getPagrnk_single:
 	mov	edi, [ebp+n]
 	mov	eax, [ebp+pik]
 	xorps	xmm0, xmm0		;somma = 0
-	movss	xmm2, [m]
-	shufps	xmm2, xmm2, 0
+	movaps	xmm2, [m]
 	xor	esi, esi		;i = 0
 ciclo1:
 	cmp	esi, edi
