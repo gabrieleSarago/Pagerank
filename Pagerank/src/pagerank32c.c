@@ -172,17 +172,17 @@ MATRIX load_dense(char* filename, int *n, int *m, int *o) {
 	FILE* fp;
 	int rows, cols, status, i;
 	char fpath[256];
-	
+
 	//sprintf salva il contenuto puntato da filename in un array di max 256 caratteri
 	sprintf(fpath, "%s.matrix", filename);
 	//apre il file non come un file di testo ma come un file binario (read binary - rb)
 	fp = fopen(fpath, "rb");
-	
+
 	if (fp == NULL) {
 		printf("'%s' : bad matrix file name!\n", fpath);
 		exit(0);
 	}
-	
+
 	/*fread salva in un blocco di memoria puntato dal primo argomento
 	* (in questo caso &rows) il numero di byte letti, ottenuto come
 	* numero_elementi*size_elementi (in questo caso 1*4, dove 4
@@ -190,27 +190,30 @@ MATRIX load_dense(char* filename, int *n, int *m, int *o) {
 	*/
 	status = fread(&rows, sizeof(int), 1, fp);
 	status = fread(&cols, sizeof(int), 1, fp);
-	*o = 0;
-	//Padding che rende la matrice pari
-	if(cols % 2 != 0){
-		cols++;
-		/*int a = cols/2;
-		a = a*2;
-		int b = cols-a;*/
-		*o = 1;
-	}
+
 	MATRIX data = alloc_matrix(rows,cols);
 	//Salva la matrice (in precisione doppia) nel blocco di memoria puntato da data
 	status = fread(data, sizeof(double), rows*cols, fp);
-
+	//Converte la matrice "data" in una matrice le cui colonne sono pari
+	*o = 0;
+	//Padding che rende le colonne della matrice pari
+	if(cols % 2 != 0){
+		*o = 1;
+		cols++;
+	}
+	MATRIX nData = alloc_matrix(rows,cols);
+	for(int i = 0; i < rows; i++){
+		for(int j = 0; j < rows; j++){
+			nData[cols*i+j] = data[i*rows+j];
+		}
+	}
 	fclose(fp);
 
 	//salva le dimensioni della matrice in n ed m
 	*n = rows;
 	//dovrebbe essere *m = cols;
-	*m = rows*cols; //(?)
-
-	return data;
+	*m = rows*(cols-*o); //(?)
+	return nData;
 }
 
 /*
