@@ -20,14 +20,15 @@ getVectorPiIn_single:
 	mov	ecx, [ebp+pi]
 	mov	eax, [ebp+o]
 	movss	xmm1, [ebp+e]
-	imul	edi, 4
+	shufps	xmm1, xmm1, 0
 	xor	esi, esi
 cicloi:
 	cmp	esi, edi
 	jge	finecicloi
-	movss	xmm0, xmm1
-	shufps	xmm0, xmm0, 0
-	movaps	[ecx + esi], xmm0
+	movaps	[ecx + esi*4], xmm1
+	movaps	[ecx+esi*4+16], xmm1
+	movaps	[ecx+esi*4+32], xmm1
+	movaps	[ecx+esi*4+48], xmm1
 	add 	esi, 16
 	jmp	cicloi
 finecicloi:

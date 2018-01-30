@@ -28,10 +28,25 @@ ciclo1:
 	haddps	xmm1, xmm1
 	haddps	xmm1, xmm1
 	addss	xmm0, xmm1		;somma += |Pik[i...i+p-1]|
-	add	esi, 4
+	movaps	xmm1, [eax+esi*4 + 16]	;salva in ebx Pik[i...i+p-1]
+	andps	xmm1, xmm2
+	haddps	xmm1, xmm1
+	haddps	xmm1, xmm1
+	addss	xmm0, xmm1		;somma += |Pik[i...i+p-1]|
+	movaps	xmm1, [eax+esi*4 + 32]	;salva in ebx Pik[i...i+p-1]
+	andps	xmm1, xmm2
+	haddps	xmm1, xmm1
+	haddps	xmm1, xmm1
+	addss	xmm0, xmm1		;somma += |Pik[i...i+p-1]|
+	movaps	xmm1, [eax+esi*4 + 48]	;salva in ebx Pik[i...i+p-1]
+	andps	xmm1, xmm2
+	haddps	xmm1, xmm1
+	haddps	xmm1, xmm1
+	addss	xmm0, xmm1		;somma += |Pik[i...i+p-1]|
+	add	esi, 16
 	jmp	ciclo1
 fineciclo1:
-	shufps	xmm0, xmm0, 0
+	shufps	xmm0, xmm0, 0		;duplica la somma
 	xor	esi, esi
 ciclo2:
 	cmp	esi, edi
@@ -39,7 +54,16 @@ ciclo2:
 	movaps	xmm1, [eax+esi*4]	;salva in xmm0	Pik[i...i+p-1]
 	divps	xmm1, xmm0
 	movaps	[eax+esi*4], xmm1
-	add	esi, 4
+	movaps	xmm1, [eax+esi*4 + 16]	;salva in xmm0	Pik[i...i+p-1]
+	divps	xmm1, xmm0
+	movaps	[eax+esi*4 + 16], xmm1
+	movaps	xmm1, [eax+esi*4 + 32]	;salva in xmm0	Pik[i...i+p-1]
+	divps	xmm1, xmm0
+	movaps	[eax+esi*4 + 32], xmm1
+	movaps	xmm1, [eax+esi*4 + 48]	;salva in xmm0	Pik[i...i+p-1]
+	divps	xmm1, xmm0
+	movaps	[eax+esi*4 + 48], xmm1
+	add	esi, 16
 	jmp	ciclo2
 fine:
 	popad

@@ -24,7 +24,7 @@ getDelta_single:
 	mov	edi, [ebp+n]
 	mov	eax, [ebp+d]
 	xor	esi, esi
-	xorps	xmm0, xmm0
+	xorps	xmm0, xmm0			;delta = 0
 cicloi:
 	cmp	esi, edi
 	jge	finecicloi
@@ -35,8 +35,32 @@ cicloi:
 	haddps	xmm1, xmm1
 	haddps	xmm1, xmm1
 	addss	xmm0, xmm1
-	movaps	[ebx+esi*4], xmm2		;Pi0[i...i+p-1] = Pik[i...i+p-1]
-	add	esi, 4
+	movaps	[ebx+esi*4], xmm2
+	movaps	xmm1, [ebx+esi*4 + 16]
+	movaps	xmm2, [ecx+esi*4 + 16]
+	subps	xmm1, xmm2
+	andps	xmm1, [m]
+	haddps	xmm1, xmm1
+	haddps	xmm1, xmm1
+	addss	xmm0, xmm1
+	movaps	[ebx+esi*4 + 16], xmm2
+	movaps	xmm1, [ebx+esi*4 + 32]
+	movaps	xmm2, [ecx+esi*4 + 32]
+	subps	xmm1, xmm2
+	andps	xmm1, [m]
+	haddps	xmm1, xmm1
+	haddps	xmm1, xmm1
+	addss	xmm0, xmm1
+	movaps	[ebx+esi*4 + 32], xmm2
+	movaps	xmm1, [ebx+esi*4 + 48]
+	movaps	xmm2, [ecx+esi*4 + 48]
+	subps	xmm1, xmm2
+	andps	xmm1, [m]
+	haddps	xmm1, xmm1
+	haddps	xmm1, xmm1
+	addss	xmm0, xmm1
+	movaps	[ebx+esi*4 + 48], xmm2		;Pi0[i...i+p-1] = Pik[i...i+p-1]
+	add	esi, 16
 	jmp	cicloi
 finecicloi:
 	movss	[eax], xmm0

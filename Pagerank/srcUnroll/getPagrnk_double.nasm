@@ -27,7 +27,19 @@ ciclo1:
 	andpd	xmm1, xmm2
 	haddpd	xmm1, xmm1
 	addsd	xmm0, xmm1		;somma += |Pik[i...i+p-1]|
-	add	esi, 2
+	movapd	xmm1, [eax+esi*8 + 16]	;salva in ebx Pik[i...i+p-1]
+	andpd	xmm1, xmm2
+	haddpd	xmm1, xmm1
+	addsd	xmm0, xmm1		;somma += |Pik[i...i+p-1]|
+	movapd	xmm1, [eax+esi*8 + 32]	;salva in ebx Pik[i...i+p-1]
+	andpd	xmm1, xmm2
+	haddpd	xmm1, xmm1
+	addsd	xmm0, xmm1		;somma += |Pik[i...i+p-1]|
+	movapd	xmm1, [eax+esi*8 + 48]	;salva in ebx Pik[i...i+p-1]
+	andpd	xmm1, xmm2
+	haddpd	xmm1, xmm1
+	addsd	xmm0, xmm1		;somma += |Pik[i...i+p-1]|
+	add	esi, 8
 	jmp	ciclo1
 fineciclo1:
 	shufpd	xmm0, xmm0, 0
@@ -38,7 +50,16 @@ ciclo2:
 	movapd	xmm1, [eax+esi*8]	;salva in xmm0	Pik[i...i+p-1]
 	divpd	xmm1, xmm0
 	movapd	[eax+esi*8], xmm1
-	add	esi, 2
+	movapd	xmm1, [eax+esi*8 + 16]	;salva in xmm0	Pik[i...i+p-1]
+	divpd	xmm1, xmm0
+	movapd	[eax+esi*8 + 16], xmm1
+	movapd	xmm1, [eax+esi*8 + 32]	;salva in xmm0	Pik[i...i+p-1]
+	divpd	xmm1, xmm0
+	movapd	[eax+esi*8 + 32], xmm1
+	movapd	xmm1, [eax+esi*8 + 48]	;salva in xmm0	Pik[i...i+p-1]
+	divpd	xmm1, xmm0
+	movapd	[eax+esi*8 + 48], xmm1
+	add	esi, 8
 	jmp	ciclo2
 fine:
 	popad

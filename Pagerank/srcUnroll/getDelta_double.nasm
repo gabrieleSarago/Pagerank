@@ -35,7 +35,28 @@ cicloi:
 	haddpd	xmm1, xmm1
 	addsd	xmm0, xmm1
 	movapd	[ebx+esi*8], xmm2		;Pi0[i...i+p-1] = Pik[i...i+p-1]
-	add	esi, 2
+	movapd	xmm1, [ebx+esi*8 + 16]
+	movapd	xmm2, [ecx+esi*8 + 16]
+	subpd	xmm1, xmm2
+	andpd	xmm1, [m]
+	haddpd	xmm1, xmm1
+	addsd	xmm0, xmm1
+	movapd	[ebx+esi*8 + 16], xmm2
+	movapd	xmm1, [ebx+esi*8 + 32]
+	movapd	xmm2, [ecx+esi*8 + 32]
+	subpd	xmm1, xmm2
+	andpd	xmm1, [m]
+	haddpd	xmm1, xmm1
+	addsd	xmm0, xmm1
+	movapd	[ebx+esi*8 + 32], xmm2
+	movapd	xmm1, [ebx+esi*8 + 48]
+	movapd	xmm2, [ecx+esi*8 + 48]
+	subpd	xmm1, xmm2
+	andpd	xmm1, [m]
+	haddpd	xmm1, xmm1
+	addsd	xmm0, xmm1
+	movapd	[ebx+esi*8 + 48], xmm2
+	add	esi, 8
 	jmp	cicloi
 finecicloi:
 	movsd	[eax], xmm0

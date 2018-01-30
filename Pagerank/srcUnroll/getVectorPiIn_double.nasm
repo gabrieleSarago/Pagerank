@@ -26,7 +26,10 @@ cicloi:
 	cmp	esi, edi
 	jge	finecicloi
 	movapd	[ecx + esi*8], xmm1
-	add 	esi, 2
+	movapd	[ecx + esi*8 + 16], xmm1
+	movapd	[ecx + esi*8 + 32], xmm1
+	movapd	[ecx + esi*8 + 48], xmm1
+	add 	esi, 8
 	jmp	cicloi
 finecicloi:
 	xor	esi, esi
