@@ -21,6 +21,7 @@ dbuf:	resq	1
 section	.data
 
 dmask:	db		'%f ',0
+imask:	db		'%d',10,0
 cr:	db		10,0
 br1:	db		'( ',0
 br2:	db		')',10,0
@@ -129,6 +130,17 @@ br2:	db		')',10,0
 		mov	rdi, %1
 		call	printf
 		vpopay
+		popaq
+%endmacro
+
+%macro	printi	1
+		pushaq
+		vpushay
+		mov	rax, 1
+		mov	rdi, imask
+		mov	rsi, %1
+		call	printf
+		vpopay		
 		popaq
 %endmacro
 

@@ -13,10 +13,6 @@ section	.data
 	align	16
 	o	equ	24
 
-section .bss
-	alignb	16	
-	s	resd	1
-
 section	.text
 	global	getVectorPik_single
 
@@ -27,9 +23,8 @@ getVectorPik_single:
 	mov	eax, [ebp+p]
 	mov	ebx, [ebp+pi0]
 	mov	ecx, [ebp+pik]
-	mov	edx, [ebp+n]		;n
-	add	edx, [ebp+o]		;n+o
-	mov	[s], edx		;n+o --> s
+	movss	xmm2, [ebp+n]		;n
+	addss	xmm2, [ebp+o]		;n+o --> xmm2
 	mov	edx, [ebp+n]
 	xor	esi, esi		;i = 0
 cicloi:
@@ -44,7 +39,7 @@ cicloj:
 	jge	finecicloi
 	movss	xmm0, [ebx+edi*4]	;Pi0[j] nei primi 32 bit di xmm0
 	shufps	xmm0, xmm0, 0		;duplica Pi0[j] in xmm0
-	mov	ecx, [s]		;n+o
+	extractps	ecx, xmm2, 0		;n+o
 	imul	ecx, edi		;j*(n+o)
 	imul	ecx, 4			;j*(n+o)*4
 	add	ecx, eax		;p+j*(n+o)*4

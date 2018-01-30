@@ -8,9 +8,7 @@ section .data
 	pik	equ	12
 	align	16
 	pic	equ	16
-section	.bss
-	alignb	16
-	b	resq	1
+
 section	.text
 	global	cvtPagerank
 cvtPagerank:
@@ -24,11 +22,12 @@ cvtPagerank:
 cicloi:
 	cmp	esi, edi
 	jge	finecicloi
+	xorps	xmm1, xmm1
+	xorps	xmm2, xmm2
 	movss	xmm1, [ebx+esi*4]		;Pik[i]
 	cvtss2sd	xmm1, xmm1
 	movss	xmm2, [ebx+esi*4+4]		;Pik[i+1]
 	cvtss2sd	xmm2, xmm2
-	printi	esi
 	movsd	[ecx+esi*4], xmm1		;Piconv[i] = (double)Pik[i]
 	movsd	[ecx+esi*4+8], xmm2		;Piconv[i+1] = (double)Pik[i+1]
 	add	esi, 2

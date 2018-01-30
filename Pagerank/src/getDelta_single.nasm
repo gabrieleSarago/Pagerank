@@ -43,3 +43,4 @@ finecicloi:
 	popad
 	mov	esp, ebp
 	pop	ebp
+	ret

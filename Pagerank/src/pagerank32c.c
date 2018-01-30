@@ -383,7 +383,7 @@ float* get_v_single(int n);
 extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o);
 extern void getPagrnk_single(int n, float *Pik);
 extern void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
-//void cvtPagerank(int n, float *Pik, double *Piconv);
+void cvtPagerank(int n, float *Pik, double *Piconv);
 double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
 
 extern void get_outdegree_double(int n, double *A, double* d, int o);

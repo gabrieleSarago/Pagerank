@@ -80,7 +80,6 @@ typedef struct {
 	int y;
 } location;
 
-
 typedef struct {
 	char* file_name;
 	MATRIX P; // codifica dense
@@ -380,29 +379,29 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
  */
 //extern void pagerank64(params* input);
 
-void get_outdegree_single(int n, float *A, float* d, int o);
+extern void get_outdegree_single(int n, float *A, float* d, int o);
 float* get_matrix_P_single(int n, float *A, float *d, int o);
 void get_matrix_P_primo_single(int n, float *P, float *d, int o);
 float* get_matriceTeletrasporto_single(int n, float *v);
 void get_matrix_P_secondo_single(int n, float *P, double c, int o);
-void getVectorPiIn_single(int n, float e, int o, float *Pi);
+extern void getVectorPiIn_single(int n, float e, int o, float *Pi);
 float* get_v_single(int n);
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o);
+extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o);
 void getPagrnk_single(int n, float *Pik);
-void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
+extern void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
 //void cvtPagerank(int n, float *Pik, double *Piconv);
 double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
 
-void get_outdegree_double(int n, double *A, double* d, int o);
+extern void get_outdegree_double(int n, double *A, double* d, int o);
 double* get_matrix_P_double(int n, double *A, double *d, int o);
 void get_matrix_P_primo_double(int n, double *P, double *d, int o);
 double* get_matriceTeletrasporto_double(int n, double *v);
 void get_matrix_P_secondo_double(int n, double *P, double c, int o);
-void getVectorPiIn_double(int n, double e, int o, double *Pi);
+extern void getVectorPiIn_double(int n, double e, int o, double *Pi);
 double* get_v_double(int n);
-void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o);
+extern void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o);
 void getPagrnk_double(int n, double *Pik);
-void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
+extern void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
 double* getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o);
 
 /*
@@ -539,7 +538,7 @@ void pagerank(params* input) {
  * Uscita = vettore degli outdegree d
  */
 
-void get_outdegree_single(int n, float *A, float *d, int o){
+/*void get_outdegree_single(int n, float *A, float *d, int o){
 	//vettore di outdegree
 	for(int i = 0; i < n; i++){
 		int out = 0;
@@ -547,16 +546,16 @@ void get_outdegree_single(int n, float *A, float *d, int o){
 			/*conta ogni volta che è presente un 1 nella riga i
 			 * corrisponde al numero di archi uscenti da i
 			*/
-			if(A[i*(n+o) + j]){
+			/*if(A[i*(n+o) + j]){
 				out++;
 			}
 		}
 		//inserisce l'outdegree nel vettore d
 		*(d+i) = out;
 	}
-}
+}*/
 
-void get_outdegree_double(int n, double *A, double *d, int o){
+/*void get_outdegree_double(int n, double *A, double *d, int o){
 	//vettore di outdegree
 	for(int i = 0; i < n; i++){
 		int out = 0;
@@ -568,7 +567,7 @@ void get_outdegree_double(int n, double *A, double *d, int o){
 		//inserisce l'outdegree nel vettore
 		*(d+i) = out;
 	}
-}
+}*/
 
 /*
  * Descrizione = funzione che ricava la matrice delle probabilità
@@ -732,16 +731,16 @@ void get_matrix_P_secondo_double(int n, double* P, double c, int o){
 	}
 }
 
-void getVectorPiIn_single(int n, float e, int o, float *Pi){
+/*void getVectorPiIn_single(int n, float e, int o, float *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
 	for(int i = 0; i < o; i++){
 		Pi[n+i] = 0;
 	}
-}
+}*/
 
-void getVectorPiIn_double(int n, double e, int o, double *Pi){
+/*void getVectorPiIn_double(int n, double e, int o, double *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
@@ -749,25 +748,25 @@ void getVectorPiIn_double(int n, double e, int o, double *Pi){
 	for(int i = 0; i < o; i++){
 		Pi[n+i] = 0;
 	}
-}
+}*/
 
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o){
+/*void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
 			Pik[i] += P[j*(n+o) + i]*Pi0[j];
 		}
 	}
-}
+}*/
 
-void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o){
+/*void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
 			Pik[i] += P[j*(n+o) + i]*Pi0[j];
 		}
 	}
-}
+}*/
 
 void getPagrnk_single(int n, float *Pik){
 	float somma = 0;
@@ -785,7 +784,7 @@ void getPagrnk_double(int n, double *Pik){
 		Pik[i] = Pik[i]/(double)somma;
 }
 
-void getDelta_single(float *Pi0, float *Pik, int n, float *delta){
+/*void getDelta_single(float *Pi0, float *Pik, int n, float *delta){
 	for(int i = 0; i < n; i++){
 		*delta += fabsf(Pi0[i]-Pik[i]);
 		Pi0[i] = Pik[i];
@@ -797,7 +796,7 @@ void getDelta_double(double *Pi0, double *Pik, int n, double *delta){
 		*delta += fabs(Pi0[i]-Pik[i]);
 		Pi0[i] = Pik[i];
 	}
-}
+}*/
 
 void cvtPagerank(int n, float *Pik, double *Piconv){
 	for(int i = 0; i < n; i++){
