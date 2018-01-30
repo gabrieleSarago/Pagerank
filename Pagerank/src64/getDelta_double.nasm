@@ -38,3 +38,4 @@ finecicloi:
 	popaq
 	mov	rsp, rbp
 	pop	rbp
+	ret

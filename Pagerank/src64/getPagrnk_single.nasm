@@ -3,7 +3,7 @@
 
 section .data
 	align	32
-	m:	dd	0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff
+	m	dd	0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff
 
 section .text
 	global	getPagrnk_single
@@ -31,6 +31,7 @@ ciclo1:
 	jmp	ciclo1
 fineciclo1:
 	vpermilps	xmm0, xmm0, 0
+	vperm2f128	ymm0, ymm0, ymm0, 0
 	xor	r10, r10
 ciclo2:
 	cmp	r10, rdi

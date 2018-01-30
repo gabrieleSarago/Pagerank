@@ -456,6 +456,7 @@ void pagerank(params* input) {
 		 */
 		float e = 1/(float)input->N;
 		get_matrix_P_primo_single(input->N, P, d, input->O);
+		_mm_free(d);
 		//float *v = get_v_single(input->N);
 		//float *E = get_matriceTeletrasporto_single(input->N, v);
 		get_matrix_P_secondo_single(input->N, P, input->c, input->O);
@@ -464,6 +465,11 @@ void pagerank(params* input) {
 		float *Pik = (float *)_mm_malloc((input->N+input->O)*sizeof(float), 16);
 		double *Piconv = (double *) _mm_malloc((input->N+input->O)*sizeof(double), 16);
 		input->pagerank = getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->O, Piconv);
+		_mm_free(Pi0);
+		_mm_free(Pik);
+		_mm_free(P);
+		_mm_free(input->pagerank);
+		_mm_free(input->S);
 	}
 	//precisione doppia
 	else if(input->G != NULL){
@@ -804,11 +810,13 @@ double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, 
 	float delta = 0;
 	while(!stop){
 		getVectorPik_single(P, Pi0, Pik, n, o);
+		printf("ciao1\n");
 		/*
 		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 		 */
 		delta = 0;
 		getDelta_single(Pi0, Pik, n, &delta);
+		printf("ciao2\n");
 		//printf("delta = %f\n", delta);
 		/*
 		 * Se il valore delta calcolato è minore di epsilon
@@ -823,6 +831,7 @@ double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, 
 	}
 	getPagrnk_single(n,Pik);
 	cvtPagerank(n, Pik, Piconv);
+	printf("ciao3\n");
 	return Piconv;
 }
 

@@ -385,27 +385,27 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 extern void get_outdegree_single(int n, float *A, float* d, int o);
 float* get_matrix_P_single(int n, float *A, float *d, int o);
 void get_matrix_P_primo_single(int n, float *P, float *d, int o);
-float* get_matriceTeletrasporto_single(int n, float *v);
+//float* get_matriceTeletrasporto_single(int n, float *v);
 void get_matrix_P_secondo_single(int n, float *P, double c, int o);
 extern void getVectorPiIn_single(int n, float e, int o, float *Pi);
-float* get_v_single(int n);
+//float* get_v_single(int n);
 extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o);
 extern void getPagrnk_single(int n, float *Pik);
 extern void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
 void cvtPagerank(int n, float *Pik, double *Piconv);
-double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
+void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
 
 extern void get_outdegree_double(int n, double *A, double* d, int o);
 double* get_matrix_P_double(int n, double *A, double *d, int o);
 void get_matrix_P_primo_double(int n, double *P, double *d, int o);
-double* get_matriceTeletrasporto_double(int n, double *v);
+//double* get_matriceTeletrasporto_double(int n, double *v);
 void get_matrix_P_secondo_double(int n, double *P, double c, int o);
 extern void getVectorPiIn_double(int n, double e, int o, double *Pi);
-double* get_v_double(int n);
+//double* get_v_double(int n);
 extern void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o);
 extern void getPagrnk_double(int n, double *Pik);
 extern void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
-double* getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o);
+void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o);
 
 /*
  *	pagerank
@@ -440,6 +440,7 @@ void pagerank(params* input) {
 		}*/
 		//matrice P
 		float *P = get_matrix_P_single(input->N, input->S, d, input->O);
+
 		//TEST matrice P
 		//Basta sostituire P con input->S per testare la matrice di adiacenza.
 		/*for(int i = 0; i < (input->N); i++){
@@ -471,8 +472,8 @@ void pagerank(params* input) {
 		float* Pi0 =(float*)_mm_malloc((input->N+input->O)*sizeof(float),16);
 		getVectorPiIn_single(input->N, e, input->O, Pi0);
 		float *Pik = (float *)_mm_malloc((input->N+input->O)*sizeof(float), 16);
-		double *Piconv = (double *) _mm_malloc((input->N+input->O)*sizeof(double), 16);
-		input->pagerank = getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->O, Piconv);
+		input->pagerank = (double *) _mm_malloc((input->N+input->O)*sizeof(double), 16);
+		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->O, input->pagerank);
 	}
 	//precisione doppia
 	else if(input->G != NULL){
@@ -513,8 +514,8 @@ void pagerank(params* input) {
 			}
 		}*/
 		getVectorPiIn_double(input->N, e, input->O, Pi0);
-		double *Pik = (double *)_mm_malloc((input->N+input->O)*sizeof(double), 16);
-		input->pagerank = getPagerank_double(Pi0, Pik, P, input->eps, input->N, input->O);
+		input->pagerank = (double *)_mm_malloc((input->N+input->O)*sizeof(double), 16);
+		getPagerank_double(Pi0, input->pagerank, P, input->eps, input->N, input->O);
 	}
 	//verifica formato dense
 	else{
@@ -525,8 +526,8 @@ void pagerank(params* input) {
 		double e = 1/(double)input->N;
 		double* Pi0 =(double*)_mm_malloc((input->N+input->O)*sizeof(double),16);
 		getVectorPiIn_double(input->N, e, input->O, Pi0);
-		double *Pik = (double *)_mm_malloc((input->N+input->O)*sizeof(double), 16);
-		input->pagerank = getPagerank_double(Pi0, Pik, input->P, input->eps, input->N, input->O);
+		input->pagerank = (double *)_mm_malloc((input->N+input->O)*sizeof(double), 16);
+		getPagerank_double(Pi0, input->pagerank, input->P, input->eps, input->N, input->O);
 	}
 
     //pagerank32(input); // Esempio di chiamata di funzione assembly
@@ -582,28 +583,26 @@ void pagerank(params* input) {
  */
 
 float* get_matrix_P_single(int n, float *A, float *d, int o){
-	float *P = (float *)_mm_malloc(n*(n+o)*sizeof(float), 16);
 	for(int i = 0; i < n; i++){
 		for(int j = 0; j < n; j++){
 			//la verifica serve per evitare divisioni inutili
 			if(A[i*(n+o) + j] != 0){
-				P[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
+				A[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
 			}
 		}
 	}
-	return P;
+	return A;
 }
 
 double* get_matrix_P_double(int n, double *A, double *d, int o){
-	double *P = (double *)_mm_malloc(n*(n+o)*sizeof(double), 16);
 	for(int i = 0; i < n; i++){
 		for(int j = 0; j < n; j++){
 			if(A[i*(n+o) + j] != 0){
-				P[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
+				A[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
 			}
 		}
 	}
-	return P;
+	return A;
 }
 
 /*
@@ -637,7 +636,7 @@ void get_matrix_P_primo_double(int n, double *P, double *d, int o){
 	}
 }
 
-float* get_matriceTeletrasporto_single(int n, float *v){
+/*float* get_matriceTeletrasporto_single(int n, float *v){
 /*Dobbiamo ricavare la matrice E detta MATRICE DI TELETRASPORTO;
 	  * E è uguale al prodotto tra i 2 vettori u e v
 	  * vettore riga di personalizzazione -> v=(1/n,1/n,....,1/n)
@@ -645,7 +644,7 @@ float* get_matriceTeletrasporto_single(int n, float *v){
 	  * E sarà una matrice con un numero di righe pari agli elementi di u e un numero di colonne
 	  * pari agli elementi di v
 	  * */
-	int* u=(int*)_mm_malloc(n*sizeof(int),16);
+	/*int* u=(int*)_mm_malloc(n*sizeof(int),16);
 	for (int j=0;j<n;j++){
 		u[j]=1;
 	}
@@ -658,9 +657,9 @@ float* get_matriceTeletrasporto_single(int n, float *v){
 		}
 	return E;
 
-}
+}*/
 
-double* get_matriceTeletrasporto_double(int n, double *v){
+/*double* get_matriceTeletrasporto_double(int n, double *v){
 /*Dobbiamo ricavare la matrice E detta MATRICE DI TELETRASPORTO;
 	  * E è uguale al prodotto tra i 2 vettori u e v
 	  * vettore riga di personalizzazione -> v=(1/n,1/n,....,1/n)
@@ -670,7 +669,7 @@ double* get_matriceTeletrasporto_double(int n, double *v){
 	  * */
 
 	// int u[1][n];
-	int* u=(int*)_mm_malloc(n*sizeof(int),16);
+	/*int* u=(int*)_mm_malloc(n*sizeof(int),16);
 	for (int j=0;j<n;j++){
 		u[j]=1;
 	}
@@ -683,9 +682,9 @@ double* get_matriceTeletrasporto_double(int n, double *v){
 		}
 	return E;
 
-}
+}*/
 
-float* get_v_single(int n){
+/*float* get_v_single(int n){
 	float *v = (float*)_mm_malloc(n*sizeof(float),16);
 	for (int i=0; i <n;i++){
 		v[i]=1/(float)n;
@@ -699,7 +698,7 @@ double* get_v_double(int n){
 		v[i]=1/(double)n;
 	}
 	return v;
-}
+}*/
 
 void get_matrix_P_secondo_single(int n, float* P, double c, int o){
 
@@ -808,7 +807,7 @@ void cvtPagerank(int n, float *Pik, double *Piconv){
 }
 
 
-double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv){
+void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv){
 	int stop = 0;
 	float delta = 0;
 	while(!stop){
@@ -832,10 +831,9 @@ double* getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, 
 	}
 	getPagrnk_single(n,Pik);
 	cvtPagerank(n, Pik, Piconv);
-	return Piconv;
 }
 
-double* getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o){
+void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o){
 	int stop = 0;
 	double delta = 0;
 	while(!stop){
@@ -861,7 +859,6 @@ double* getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int 
 		}
 	}
 	getPagrnk_double(n,Pik);
-	return Pik;
 }
 
 
