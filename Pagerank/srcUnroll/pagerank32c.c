@@ -392,7 +392,7 @@ extern void getVectorPiIn_single(int n, float e, int o, float *Pi);
 extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o);
 extern void getPagrnk_single(int n, float *Pik);
 extern void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
-void cvtPagerank(int n, float *Pik, double *Piconv);
+extern void cvtPagerank(int n, float *Pik, double *Piconv);
 void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
 
 extern void get_outdegree_double(int n, double *A, double* d, int o);
@@ -800,11 +800,11 @@ void get_matrix_P_secondo_double(int n, double* P, double c, int o){
 	}
 }*/
 
-void cvtPagerank(int n, float *Pik, double *Piconv){
+/*void cvtPagerank(int n, float *Pik, double *Piconv){
 	for(int i = 0; i < n; i++){
 		Piconv[i] = (double) Pik[i];
 	}
-}
+}*/
 
 
 void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv){

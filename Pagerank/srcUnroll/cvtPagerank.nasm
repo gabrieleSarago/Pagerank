@@ -23,18 +23,14 @@ cicloi:
 	cmp	esi, edi
 	jge	finecicloi
 	xorps	xmm1, xmm1
-	xorps	xmm2, xmm2
 	movss	xmm1, [ebx+esi*4]		;Pik[i]
 	cvtss2sd	xmm1, xmm1
-	movss	xmm2, [ebx+esi*4+4]		;Pik[i+1]
-	cvtss2sd	xmm2, xmm2
-	movsd	[ecx+esi*4], xmm1		;Piconv[i] = (double)Pik[i]
-	movsd	[ecx+esi*4+8], xmm2		;Piconv[i+1] = (double)Pik[i+1]
-	add	esi, 2
+	movsd	[ecx+esi*8], xmm1		;Piconv[i] = (double)Pik[i]
+	inc	esi
 	jmp	cicloi
 finecicloi:
 	popad
 	mov	esp, ebp
 	pop	ebp
-	
+	ret
 	
