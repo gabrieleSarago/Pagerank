@@ -268,19 +268,19 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
  */
 //extern void pagerank32(params* input);
 
-float*	get_adiacency_matrix_single(int n, int m, location *l, int *o);
-void get_outdegree_single(int n, float *A, float* d, int o);
-float* get_matrix_P_single(int n, float *A, float *d, int o);
-void get_matrix_P_primo_single(int n, float *P, float *d, int o);
+float*	get_adiacency_matrix_single(int n, int m, location *l, int *o,  int *cnz, int *cz, int *z, int *nz);
+void get_outdegree_single(int n, int cnz, float *A, float* d, int o);
+float* get_matrix_P_single(int n, int cnz, float *A, float *d, int o);
+void get_matrix_P_primo_single(int n, int cnz, float *P, float *d, int o);
 //float* get_matriceTeletrasporto_single(int n, float *v);
-void get_matrix_P_secondo_single(int n, float *P, double c, int o);
+void get_matrix_P_secondo_single(int n, int cnz, float *P, double c, int o);
 void getVectorPiIn_single(int n, float e, int o, float *Pi);
 //float* get_v_single(int n);
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o);
+void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o, int cnz, int cz, int *nz, int *z);
 void getPagrnk_single(int n, float *Pik);
 void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
 void cvtPagerank(int n, float *Pik, double *Piconv);
-void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
+void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, int cnz, int cz, int *nz, int *z, double *Piconv);
 
 double* get_adiacency_matrix_double(int n, int m, location *l, int *o);
 double* getMatrix(int n, double *P, int *o);
@@ -321,15 +321,15 @@ void pagerank(params* input) {
 	//verifica formato sparse single o double
 	//precisione singola
 	if(!input->format && !input->prec){
-		float *A = get_adiacency_matrix_single(input->N, input->M, input->G, &input->O);
-		float *d = (float *)_mm_malloc(input->N*sizeof(float), 16);
-		//input->S[0] = 1.0;
-		get_outdegree_single(input->N, A, d, input->O);
-		/*for(int i = 0; i < input->N; i++){
-			printf("d[%d] = %f\n", i, d[i]);
-		}*/
+		int *nz = (int *)_mm_malloc(input->N*sizeof(int), 16);
+		int *z = (int *)_mm_malloc(input->N*sizeof(int), 16);
+		int cnz = 0;
+		int cz = 0;
+		float *A = get_adiacency_matrix_single(input->N, input->M, input->G, &input->O, &cnz, &cz, z, nz);
+		float *d = (float *)_mm_malloc(cnz*sizeof(float), 16);
+		get_outdegree_single(input->N, cnz, A, d, input->O);
 		//matrice P
-		float *P = get_matrix_P_single(input->N, A, d, input->O);
+		float *P = get_matrix_P_single(input->N, cnz, A, d, input->O);
 
 		//TEST matrice P
 		//Basta sostituire P con input->S per testare la matrice di adiacenza.
@@ -355,15 +355,19 @@ void pagerank(params* input) {
 		 * nessuna matrice.
 		 */
 		float e = 1/(float)input->N;
-		get_matrix_P_primo_single(input->N, P, d, input->O);
+		/*
+		 * Essendo la matrice privata delle righe nulle, questa è già una matrice
+		 * di transizione valida.
+		 */
+		//get_matrix_P_primo_single(input->N, P, d, input->O);
 		//float *v = get_v_single(input->N);
 		//float *E = get_matriceTeletrasporto_single(input->N, v);
-		get_matrix_P_secondo_single(input->N, P, input->c, input->O);
+		get_matrix_P_secondo_single(input->N, cnz, P, input->c, input->O);
 		float* Pi0 =(float*)_mm_malloc((input->N+input->O)*sizeof(float),16);
 		getVectorPiIn_single(input->N, e, input->O, Pi0);
 		float *Pik = (float *)_mm_malloc((input->N+input->O)*sizeof(float), 16);
 		input->pagerank = (double *) _mm_malloc((input->N+input->O)*sizeof(double), 16);
-		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->O, input->pagerank);
+		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->O, cnz, cz, nz, z, input->pagerank);
 	}
 	//precisione doppia
 	else if(!input->format && input->prec){
@@ -427,8 +431,21 @@ void pagerank(params* input) {
     // -------------------------------------------------
 
 }
+/*
+ * Descrizione: serve per capire, dato un indice di riga,
+ * il nuovo indice di riga nella matrice ridotta.
+ */
 
-float* get_adiacency_matrix_single(int n, int m, location *l, int *o){
+int getRow(int i, int *nz, int cnz){
+	for(int k = 0; k < cnz; k++){
+		if(nz[k] == i){
+			return k;
+		}
+	}
+	return -1;
+}
+
+float* get_adiacency_matrix_single(int n, int m, location *l, int *o, int *cnz, int *cz, int *z, int *nz){
 	/*
 	* Matrice di adiacenza n*n, dove n è il numero di nodi
 	* il puntatore g punta a un blocco di memoria di nodes*nodes elementi
@@ -452,12 +469,48 @@ float* get_adiacency_matrix_single(int n, int m, location *l, int *o){
 		*o = 16-b;
 		cols+=*o;
 	}
-	float* s = (float*)_mm_malloc(n*cols*sizeof(float), 16);
+	//vettore di elementi non nulli
+	*cz = 0;
+	*cnz = 0;
+	int trovato = 0;
+	/*
+	 * Per ogni nodo si va a vedere se ha archi in uscita
+	 * Se sono presenti l'indice di riga è messo in nz
+	 * Altrimenti è messo in z
+	 */
+	for(int i = 0; i < n; i++){
+		for(int k = 0; k < m; k++){
+			if((l[k].x-1) == i){
+				nz[*cnz] = i;
+				trovato = 1;
+				*cnz += 1;
+				break;
+			}
+		}
+		if(!trovato){
+			z[*cz] = i;
+			*cz+=1;
+		}
+		trovato = 0;
+	}
+
+	/*
+	 * A questo punto cnz contiene il numero di righe non nulle
+	 * Quindi è possibile allocare una matrice di dimensione cnz*(n+o)
+	 */
+
+	float* s = (float *)_mm_malloc((*cnz)*cols*sizeof(float), 16);
 	int i, j;
 	for(int k = 0; k < m; k++){
-		i = l[k].x-1;
+		i = getRow(l[k].x-1, nz, *cnz);
 		j = l[k].y-1;
-		s[i*(n+*o)+j] = 1.0;
+		s[i*cols+j] = 1.0;
+		/*
+		 * Invece di calcolare l'outdegree successivamente, si sceglie di calcolarlo
+		 * in questo momento per evitare di ricontrollare la matrice.
+		 */
+		//printf("%f\n", d[i]);
+
 	}
 	return s;
 }
@@ -510,9 +563,9 @@ double* getMatrix(int n, double *P, int *o){
  * Uscita = vettore degli outdegree d
  */
 
-void get_outdegree_single(int n, float *A, float *d, int o){
+void get_outdegree_single(int n, int cnz, float *A, float *d, int o){
 	//vettore di outdegree
-	for(int i = 0; i < n; i++){
+	for(int i = 0; i < cnz; i++){
 		int out = 0;
 		for(int j = 0; j < n; j++){
 			/*conta ogni volta che è presente un 1 nella riga i
@@ -550,8 +603,8 @@ void get_outdegree_double(int n, double *A, double *d, int o){
  * Uscita = matrice delle probabilità di transizione P = A/d
  */
 
-float* get_matrix_P_single(int n, float *A, float *d, int o){
-	for(int i = 0; i < n; i++){
+float* get_matrix_P_single(int n, int cnz, float *A, float *d, int o){
+	for(int i = 0; i < cnz; i++){
 		for(int j = 0; j < n; j++){
 			//la verifica serve per evitare divisioni inutili
 			if(A[i*(n+o) + j] != 0){
@@ -581,9 +634,9 @@ double* get_matrix_P_double(int n, double *A, double *d, int o){
  * Post-Condizione = Matrice di transizione P valida
  */
 
-void get_matrix_P_primo_single(int n, float *P, float *d, int o){
+void get_matrix_P_primo_single(int n, int cnz, float *P, float *d, int o){
 	//verifica i nodi "i" che non hanno link di uscita
-	for(int i = 0; i < n; i++){
+	for(int i = 0; i < cnz; i++){
 		//se l'outdegree è nullo sostituisce la riga con v
 		if(d[i] == 0){
 			for(int j = 0; j < n; j++){
@@ -604,27 +657,23 @@ void get_matrix_P_primo_double(int n, double *P, double *d, int o){
 	}
 }
 
-void get_matrix_P_secondo_single(int n, float* P, double c, int o){
+void get_matrix_P_secondo_single(int n, int cnz, float* P, double c, int o){
 
-	//float c= rand()/(float)RAND_MAX; <- non va scritto, viene dato da input
-	//float c=0.85;// il parametro deve poter variare
 	/*Andiamo a calcolare P'' a precisione singola seguendo la formula P''=cP'+(1-c)E
 		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
 		 * */
 	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
 
 	float e = (1-c)*(1/(float)n);
-	for(int i=0; i<n; i++){
+	for(int i=0; i<cnz; i++){
 		for(int j=0; j<n; j++){
-			P[i*(n+o)+j]=c*P[i*(n+o)+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
+			P[i*(n+o)+j]=c*P[i*(n+o)+j] + e;// P2[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
 		}
 	}
 }
 
 void get_matrix_P_secondo_double(int n, double* P, double c, int o){
-	//double c= rand()/(double)RAND_MAX;
 
-	//double c=0.85; il parametro c deve poter variare
 	/*Andiamo a calcolare P'' a precisione singola seguendo la formula P''=cP'+(1-c)E
 		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
 		 * */
@@ -641,9 +690,10 @@ void getVectorPiIn_single(int n, float e, int o, float *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
-	for(int i = 0; i < o; i++){
+
+	/*for(int i = 0; i < o; i++){
 		Pi[n+i] = 0;
-	}
+	}*/
 }
 
 void getVectorPiIn_double(int n, double e, int o, double *Pi){
@@ -651,19 +701,40 @@ void getVectorPiIn_double(int n, double e, int o, double *Pi){
 		Pi[i]=e;
 	}
 	//Serve in assembly per evitare che ci sia 1/n al posto degli zeri di padding
-	for(int i = 0; i < o; i++){
+	/*for(int i = 0; i < o; i++){
 		Pi[n+i] = 0;
+	}*/
+}
+
+void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o, int cnz, int cz, int *nz, int *z){
+	for(int i = 0; i < cnz; i++){
+		Pik[nz[i]] = 0;
+		for(int j = 0; j < cnz; j++){
+			Pik[nz[i]] += P[j*(n+o)+nz[i]]*Pi0[nz[j]];
+		}
+		for(int j = 0; j < cz; j++){
+			Pik[nz[i]] += (1/(float)n)*Pi0[z[j]];
+		}
+	}
+	for(int i = 0; i < cz; i++){
+		Pik[z[i]] = 0;
+		for(int j = 0; j < cnz; j++){
+			Pik[z[i]] += P[j*(n+o)+z[i]]*Pi0[nz[j]];
+		}
+		for(int j = 0; j < cz; j++){
+			Pik[z[i]] += (1/(float)n)*Pi0[z[j]];
+		}
 	}
 }
 
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o){
+/*void getVectorPik_single(float *P, int cnz, float *Pi0, float *Pik, int n, int o){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
 			Pik[i] += P[j*(n+o) + i]*Pi0[j];
 		}
 	}
-}
+}*/
 
 void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o){
 	for(int i = 0; i < n; i++){
@@ -711,27 +782,23 @@ void cvtPagerank(int n, float *Pik, double *Piconv){
 }
 
 
-void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv){
-	int stop = 0;
+void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, int cnz, int cz, int *nz, int *z, double *Piconv){
+	/*
+	 * Se il valore delta calcolato è minore di epsilon
+	 * allora siamo arrivati all'iterazione che ci fa ottenere
+	 * il vettore dei pagerank. Altrimenti si aggiorna Pi0 che conterrà
+	 * l'iterazione attuale e si esegue un'altra iterazione.
+	 */
 	float delta = 0;
-	while(!stop){
-		getVectorPik_single(P, Pi0, Pik, n, o);
+	getVectorPik_single(P, Pi0, Pik, n, o, cnz, cz, nz, z);
+	getDelta_single(Pi0, Pik, n, &delta);
+	while(delta > eps){
+		getVectorPik_single(P, Pi0, Pik, n, o, cnz, cz, nz, z);
 		/*
 		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 		 */
 		delta = 0;
 		getDelta_single(Pi0, Pik, n, &delta);
-		//printf("delta = %f\n", delta);
-		/*
-		 * Se il valore delta calcolato è minore di epsilon
-		 * allora siamo arrivati all'iterazione che ci fa ottenere
-		 * il vettore dei pagerank. Altrimenti si aggiorna Pi0 che conterrà
-		 * l'iterazione attuale e si esegue un'altra iterazione.
-		 */
-		if(delta < eps){
-			stop = 1;
-			break;
-		}
 	}
 	getPagrnk_single(n,Pik);
 	cvtPagerank(n, Pik, Piconv);
