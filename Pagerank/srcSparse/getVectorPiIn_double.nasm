@@ -2,13 +2,9 @@
 %include "sseutils.nasm"
 
 section .data
-	align	16
 	n	equ	8
-	align	16
 	e	equ	12
-	align	16
 	o	equ	20
-	align	16
 	pi	equ	24
 section	.text
 	global	getVectorPiIn_double

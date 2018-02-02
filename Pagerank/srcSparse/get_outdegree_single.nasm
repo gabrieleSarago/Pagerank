@@ -2,14 +2,11 @@
 %include "sseutils.nasm"
 
 section .data
-	align	16		;align serve?
 	n	equ	8
-	align	16
-	a	equ	12
-	align	16
-	d	equ	16
-	align	16
-	o	equ	20
+	cnz	equ	12
+	a	equ	16
+	d	equ	20
+	no	equ	24
 
 section	.text
 	global	get_outdegree_single
@@ -20,18 +17,18 @@ get_outdegree_single:
 	mov	ebp, esp
 	pushad
 	mov	ecx, [ebp+a]		;indirizzo di A
-	mov	ebx, [ebp+n]		;valore di n
+	mov	ebx, [ebp+cnz]		;valore di n
 	mov	edx, [ebp+d]
 	mov	esi, 0			;i = 0
 cicloi:
 	cmp	esi, ebx
 	jge	fine
-	mov	eax, ebx
-	add	eax, [ebp+o]		;(n+o)
+	mov	eax, [ebp+no]		;n+o
 	imul	eax, esi		;(n+o)*i
 	imul	eax, 4			;(n+o)*i*4
 	add	eax, ecx		;a+(n+o)*i*4
 	xorps	xmm1, xmm1		;out = 0
+	mov	ebx, [ebp+n]
 	mov	edi, 0			;j = 0
 ciclou:					;ciclo loop unrolling
 	cmp	edi, ebx
@@ -55,7 +52,8 @@ ciclou:					;ciclo loop unrolling
 	add	edi, 16				;16 elementi per volta vengono processati
 	jmp	ciclou
 fineciclou:
-	movss	[edx+esi*4], xmm1	
+	movss	[edx+esi*4], xmm1
+	mov	ebx, [ebp+cnz]	
 	inc	esi
 	jmp	cicloi
 fine:
