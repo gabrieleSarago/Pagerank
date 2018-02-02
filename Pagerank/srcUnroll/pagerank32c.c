@@ -635,13 +635,8 @@ void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, 
 
 int main(int argc, char** argv) {
 	
-	//alloca un blocco di memoria, puntato da input, che contiene una struct params
 	params* input = malloc(sizeof(params));
 
-	/*Inizializzazione membri della struct
-	 * format indica il formato sparse o dense, default = sparse
-	 * precisione di default = singola
-	 */
 	input->file_name = NULL;
 	input->P = NULL; // dense format
 	input->G = NULL; // sparse format
