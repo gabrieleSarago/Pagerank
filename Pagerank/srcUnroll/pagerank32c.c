@@ -56,22 +56,13 @@
 #include <time.h>
 #include <xmmintrin.h>
 
-/*
- * NOTA 1: define sostituisce le occorrenze (MATRIX, VECTOR, etc.) col valore corrispondente
- * siccome è qualcosa che fa il preprocessore, utilizzarle non oppupa memoria e non inficia
- * le prestazioni. Utilizzare GRAPHD e GRAPHS risulta quindi una scelta appropriata.
- *
- * NOTA 2: per eseguire il codice bisognerà utilizzare gcc e non eclipse, dato che librerie come
- * math.h hanno bisogno dell'argomento -lm per poter funzionare.
- */
-
 #define	MATRIX	double*
 #define	VECTOR	double*
-#define	GRAPHD	double*	// DECIDERE LA RAPPRESENTAZIONE IN MEMORIA (dev'essere un puntatore) (float* o double*)
-#define GRAPHS	float* //rappresentazione in precisione singola
+#define	GRAPH	location*
 
 /*
- * Struct riferita agli archi del grafo (?), per ora non usata.
+ * Struct riferita agli archi del grafo, dove x è il nodo sorgente
+ * mentre y è il nodo destinazione.
  */
 typedef struct {
 	int x;
@@ -82,17 +73,16 @@ typedef struct {
 typedef struct {
 	char* file_name;
 	MATRIX P; // codifica dense
-	GRAPHD G; // codifica full (sparse) double
-	GRAPHS S; // codifica sparse single
+	GRAPH G; // codifica full (sparse) double
 	int N; // numero di nodi
 	int M; // numero di archi
-	int O; // padding
+	int NO; // padding
 	double c; // default=0.85
 	double eps; // default=1e-5
 	int format; // 0=sparse, 1=full
 	int prec; // 0=single, 1=double
 	int opt; // 0=nopt, 1=opt
-	double* pagerank;
+	double* pagerank; //output dell'algoritmo
 	int silent;
 	int display;
 } params;
@@ -101,34 +91,15 @@ typedef struct {
 /*
  * 
  *	Le funzioni sono state scritte assumendo che le matrici siano memorizzate
- * 	mediante un array (float*), in modo da occupare un unico blocco
- * 	di memoria, ma a scelta del candidato possono essere 
- * 	memorizzate mediante array di array (float**).
+ * 	mediante un array (float*), questo fa in modo che gli elementi della matrice
+ * 	siano contigue e questo può velocizzare l'accesso alla matrice grazie all'utilizzo
+ * 	della cache.
  * 
- * 	In entrambi i casi il candidato dovrà inoltre scegliere se memorizzare le
- * 	matrici per righe (row-major order) o per colonne (column major-order).
- *
- * 	L'assunzione corrente è che le matrici siano in row-major order.
- *
- * 	La scelta è quella di mantenere il row-major order, in quanto
- * 	risulta intuitivo elaborare gli elementi.
+ * 	L'ordine di memorizzazione della matrice è per righe (row-major order)
  * 
- */
-
-/*
- * TODO: possibile accorpamento delle seguenti 4 funzioni in due.
- * Fare chiamate a più funzioni comporta allocare più activation frame
- * nello stack, e questo fa sprecare tempo. Bisogna attuare un compromesso tra
- * velocità di esecuzione e modularità del codice.
  */
 
 void* get_block(int size, int elements) {
-	/*
-	 * _mm_malloc si utilizza per allocare un blocco "allineato" di memoria.
-	 * Siccome ogni sistema operativo ha una funzione diversa per fare ciò,
-	 * utilizzare _mm_malloc consente di fare la stessa operazione in modo
-	 * indipendente dal S.O. in uso (POSIX => Linux/non-POSIX => Windows).
-	 */
 	return _mm_malloc(elements*size,16);
 }
 
@@ -159,8 +130,7 @@ void dealloc_matrix(MATRIX mat) {
  * 	Codifica del file:
  * 	primi 4 byte: numero di righe (N) --> numero intero a 32 bit
  * 	successivi 4 byte: numero di colonne (M) --> numero intero a 32 bit
- * 	successivi N*M*4 byte: matrix data in row-major order --> numeri floating-point a precisione doppia
- * 	Siccome è precisione doppia (double) non è N*M*4 ma N*M*8, dato che un double occupa 8 byte
+ * 	successivi N*M*8 byte: matrix data in row-major order --> numeri floating-point a precisione doppia
  * 
  *****************************************************************************
  *	Se lo si ritiene opportuno, è possibile cambiare la codifica in memoria
@@ -168,55 +138,27 @@ void dealloc_matrix(MATRIX mat) {
  *****************************************************************************
  * 
  */
-MATRIX load_dense(char* filename, int *n, int *m, int *o) {
+MATRIX load_dense(char* filename, int *n, int *m) {
 	FILE* fp;
 	int rows, cols, status, i;
 	char fpath[256];
-
-	//sprintf salva il contenuto puntato da filename in un array di max 256 caratteri
 	sprintf(fpath, "%s.matrix", filename);
-	//apre il file non come un file di testo ma come un file binario (read binary - rb)
 	fp = fopen(fpath, "rb");
 
 	if (fp == NULL) {
 		printf("'%s' : bad matrix file name!\n", fpath);
 		exit(0);
 	}
-
-	/*fread salva in un blocco di memoria puntato dal primo argomento
-	* (in questo caso &rows) il numero di byte letti, ottenuto come
-	* numero_elementi*size_elementi (in questo caso 1*4, dove 4
-	* è dato da sizeof(int))
-	*/
 	status = fread(&rows, sizeof(int), 1, fp);
 	status = fread(&cols, sizeof(int), 1, fp);
 
 	MATRIX data = alloc_matrix(rows,cols);
-	//Salva la matrice (in precisione doppia) nel blocco di memoria puntato da data
 	status = fread(data, sizeof(double), rows*cols, fp);
-	//Converte la matrice "data" in una matrice le cui colonne sono pari
-	*o = 0;
-	//Padding che rende le colonne della matrice multiple di 8 elementi
-	if(cols % 8 != 0){
-		int a = cols/8;
-		a = a*8;
-		int b = cols-a;
-		*o = 8-b;
-		cols+=*o;
-	}
-	MATRIX nData = alloc_matrix(rows,cols);
-	for(int i = 0; i < rows; i++){
-		for(int j = 0; j < rows; j++){
-			nData[cols*i+j] = data[i*rows+j];
-		}
-	}
 	fclose(fp);
 
-	//salva le dimensioni della matrice in n ed m
 	*n = rows;
-	//dovrebbe essere *m = cols;
-	*m = rows*(cols-*o); //(?)
-	return nData;
+	*m = rows*cols;
+	return data;
 }
 
 /*
@@ -232,7 +174,7 @@ MATRIX load_dense(char* filename, int *n, int *m, int *o) {
  * 	successivi M*2*4 byte: M archi rappresentati come coppie (i,j) di interi a 32 bit 
  * 
  */
-GRAPHD load_sparse_double(char* filename, int *n, int *m, int *o) {
+location* load_sparse(char* filename, int *n, int *m) {
 	FILE* fp;
 	int nodes, arcs, status, i;
 	char fpath[256];
@@ -248,117 +190,23 @@ GRAPHD load_sparse_double(char* filename, int *n, int *m, int *o) {
 	
 	status = fread(&nodes, sizeof(int), 1, fp);
 	status = fread(&arcs, sizeof(int), 1, fp);
-
-	*o = 0;
-	int cols = nodes;
-	//Padding che rende le colonne della matrice multiple di 8 elementi
-	//Dato che il loop unrolling prende 8 elementi per volta
-	if(cols % 8 != 0){
-		int a = nodes/8;
-		a = a*8;
-		int b = nodes-a;
-		*o = 8-b;
-		cols+=*o;
-	}
 	/*
-	 * Matrice di adiacenza n*n, dove n è il numero di nodi
-	 * il puntatore g punta a un blocco di memoria di nodes*nodes elementi
-	 * dove ogni elemento occupa 8 byte. In questo momento la matrice contiene solo
-	 * 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
+	 * Si salva il contenuto del file tramite una lista di struct location
 	 */
-	GRAPHD g = (GRAPHD)_mm_malloc(nodes*cols*sizeof(double),16); //alloca la struttura dati contenente il grafo
-	/*
-	 * Nota: per accedere all'elemento g[i][j]
-	 * bisogna fare g[i*nodes + j]
-	 * perchè si tratta di una allocazione di una matrice, simulata
-	 * con un vettore, usando il calcolo esplicito degli elementi.
-	 */
-	/*for(int i = 12000; i < nodes; i++){
-		for(int j = 12000; j < nodes; j++){
-			printf("g[%d][%d] = %f\n",i,j,g[i*nodes+j]);
-		}
-	}*/
+	location *l = malloc(arcs*sizeof(location));
 	for (i = 0; i < arcs; i++) {
 		status = fread(&sorg, sizeof(int), 1, fp);
 		status = fread(&dest, sizeof(int), 1, fp);
-
-		// aggiungi l'arco (sorg,dest) a g
-		/*
-		 * Riga = sorg, colonna = dest, g[sorg][dest] = 1
-		 */
-		/*if(sorg == 2317 && dest == 2306){
-			printf("Trovato! dest = %d\n",dest);
-		}*/
-		//printf("sorg = %d dest = %d\n", sorg, dest);
-		g[(sorg -1)*(nodes + *o) + (dest-1)] = 1;
+		//Popola le struct
+		l[i].x = sorg;
+		l[i].y = dest;
 	}
 
 	fclose(fp);
 
 	*n = nodes;
 	*m = arcs;
-	return g;
-}
-
-/*
- * Versione a precisione singola
- */
-
-GRAPHS load_sparse_single(char* filename, int *n, int *m, int *o){
-	FILE* fp;
-	int nodes, arcs, status, i;
-	char fpath[256];
-	int sorg, dest;
-
-	sprintf(fpath, "%s.graph", filename);
-	fp = fopen(fpath, "rb");
-
-	if (fp == NULL) {
-		printf("'%s' : bad graph file name!\n", fpath);
-		exit(0);
-	}
-
-	status = fread(&nodes, sizeof(int), 1, fp);
-	status = fread(&arcs, sizeof(int), 1, fp);
-
-	/*
-	 * Matrice di adiacenza n*n, dove n è il numero di nodi
-	 * il puntatore g punta a un blocco di memoria di nodes*nodes elementi
-	 * dove ogni elemento occupa 4 byte. In questo momento la matrice contiene solo
-	 * 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
-	 */
-	//Padding che rende le colonne della matrice multiple di 16
-	/*Il padding comporta due benefici:
-	 * 1) Elimina il ciclo resto
-	 * 2) Elimina il ciclo quoziente nel loop unrolling
-	 * All'inizio le colonne della matrice erano multiple di 4 perchè
-	 * la loop vectorization prendeva 4 elementi per volta
-	 * Ora diventano multiple di 16 dato che l'unrolling prende 16 elementi per volta
-	 */
-	*o = 0;
-	int cols = nodes;
-	if(nodes % 16 != 0){
-		int a = nodes/16;
-		a = a*16;
-		int b = nodes-a;
-		*o = 16-b;
-		cols+=*o;
-	}
-	GRAPHS s = (GRAPHS)_mm_malloc(nodes*cols*sizeof(float), 16); //alloca la struttura dati contenente il grafo
-	/*
-	 * Anche in questo caso s[i][j] = s[i*nodes + j]
-	 */
-	for (i = 0; i < arcs; i++) {
-		status = fread(&sorg, sizeof(int), 1, fp);
-		status = fread(&dest, sizeof(int), 1, fp);
-		// aggiungi l'arco (sorg,dest) a s
-		s[(sorg-1)*(nodes+*o) + (dest-1)] = 1;
-	}
-	fclose(fp);
-
-	*n = nodes;
-	*m = arcs;
-	return s;
+	return l;
 }
 
 /*
@@ -376,78 +224,47 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 	fclose(fp);
 }
 
-/*
- * Prototipo che si riferisce a una funzione presente in
- * un altro file.
- */
-//extern void pagerank32(params* input);
+float* get_adiacency_matrix_single(int n, int m, location *l, int *no, float *d);
+float* get_matrix_P_single(int n, float *A, float *d, int no, double c);
+void getVectorPiIn_single(int n, float e, int o, float *Pi);
+void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no);
+void getPagrnk_single(int n, float *Pik);
+void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
+void cvtPagerank(int n, float *Pik, double *Piconv);
+void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int no, double *Piconv);
 
-extern void get_outdegree_single(int n, float *A, float* d, int o);
-float* get_matrix_P_single(int n, float *A, float *d, int o);
-void get_matrix_P_primo_single(int n, float *P, float *d, int o);
-//float* get_matriceTeletrasporto_single(int n, float *v);
-void get_matrix_P_secondo_single(int n, float *P, double c, int o);
-extern void getVectorPiIn_single(int n, float e, int o, float *Pi);
-//float* get_v_single(int n);
-extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o);
-extern void getPagrnk_single(int n, float *Pik);
-extern void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
-extern void cvtPagerank(int n, float *Pik, double *Piconv);
-void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv);
+double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *d);
+double* getMatrix(int n, double *P, int *no);
+double* get_matrix_P_double(int n, double *A, double *d, int no, double c);
+void getVectorPiIn_double(int n, double e, int no, double *Pi);
+void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no);
+void getPagrnk_double(int n, double *Pik);
+void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
+void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int no);
 
-extern void get_outdegree_double(int n, double *A, double* d, int o);
-double* get_matrix_P_double(int n, double *A, double *d, int o);
-void get_matrix_P_primo_double(int n, double *P, double *d, int o);
-//double* get_matriceTeletrasporto_double(int n, double *v);
-void get_matrix_P_secondo_double(int n, double *P, double c, int o);
-extern void getVectorPiIn_double(int n, double e, int o, double *Pi);
-//double* get_v_double(int n);
-extern void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o);
-extern void getPagrnk_double(int n, double *Pik);
-extern void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
-void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o);
 
-/*
- *	pagerank
- * 	====
- * 
- *	img contiene l'immagine codificato come una matrice di N righe
- * 	ed M colonne memorizzata in un array lineare in row-major order
- * 
- *	Se lo si ritiene opportuno, è possibile cambiare la codifica in memoria
- * 	dell'immagine.
- * 
- * 
- */
 void pagerank(params* input) {
 	
-    // -------------------------------------------------
-    // Codificare qui l'algoritmo risolutivo
-    // -------------------------------------------------
     /*
-     * 1° step: passare dalla matrice G o S alla matrice P, utilizzando l'outdegree.
+     * 1° step: passare dal grafo G, inteso come lista di struct location, alla matrice P, utilizzando l'outdegree.
      * In particolare si vuole ottenere prima il vettore degli outdegree e poi imporre:
-     * P[i][j] = (G oppure S)[i][j]/outdegree[i];
+     * P[i][j] = A[i][j]/outdegree[i];
+     * A differenza della versione precedente, dove l'outdegree veniva calcolato in una funzione apposita
+     * Si sceglie di accorpare questa operazione a quella della memorizzazione della matrice sparsa.
+     * In questo modo si evita di ricontrollare la matrice.
      */
 	//verifica formato sparse single o double
 	//precisione singola
-	if(input->S != NULL){
+	if(!input->format && !input->prec){
+		/*
+		 * Si costruisce la matrice di adiacenza a partire da una lista di struct location
+		 * dove ogni location corrisponde a un arco dal nodo x al nodo y.
+		 */
 		float *d = (float *)_mm_malloc(input->N*sizeof(float), 16);
-		//input->S[0] = 1.0;
-		get_outdegree_single(input->N, input->S, d, input->O);
-		/*for(int i = 0; i < input->N; i++){
-			printf("d[%d] = %f\n", i, d[i]);
-		}*/
-		//matrice P
-		float *P = get_matrix_P_single(input->N, input->S, d, input->O);
-
-		//TEST matrice P
-		//Basta sostituire P con input->S per testare la matrice di adiacenza.
-		/*for(int i = 0; i < (input->N); i++){
-			for(int j = 0; j < (input->N); j++){
-				printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
-			}
-		}*/
+		float *A = get_adiacency_matrix_single(input->N, input->M, input->G, &input->NO, d);
+		float e = 1/(float)input->N;
+		//Dalla matrice di adiacenza a P''
+		float *P = get_matrix_P_single(input->N, A, d, input->NO, input->c);
 
 		/*
 		 * 2° step: passare dalla matrice P a una matrice di transizione valida P'
@@ -464,76 +281,127 @@ void pagerank(params* input) {
 		 * ottenuta modificando la matrice P, per questo motivo la seguente funzione non restituisce
 		 * nessuna matrice.
 		 */
-		float e = 1/(float)input->N;
-		get_matrix_P_primo_single(input->N, P, d, input->O);
-		//float *v = get_v_single(input->N);
-		//float *E = get_matriceTeletrasporto_single(input->N, v);
-		get_matrix_P_secondo_single(input->N, P, input->c, input->O);
-		float* Pi0 =(float*)_mm_malloc((input->N+input->O)*sizeof(float),16);
-		getVectorPiIn_single(input->N, e, input->O, Pi0);
-		float *Pik = (float *)_mm_malloc((input->N+input->O)*sizeof(float), 16);
-		input->pagerank = (double *) _mm_malloc((input->N+input->O)*sizeof(double), 16);
-		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->O, input->pagerank);
+		/*
+		 * A differenza della precedente versione, si provvede a un calcolo diretto dalla matrice
+		 * di adiacenza alla matrice di transizione P'', i cui elementi sono non-negativi.
+		 * Come per l'outdegree, in questo modo si evita di rivedere la matrice più volte.
+		 */
+		//get_matrix_P_primo_single(input->N, P, d, input->NO);
+		//get_matrix_P_secondo_single(input->N, P, input->c, input->NO);
+		float* Pi0 =(float*)_mm_malloc(input->NO*sizeof(float),16);
+		getVectorPiIn_single(input->N, e, input->NO, Pi0);
+		float *Pik = (float *)_mm_malloc(input->NO*sizeof(float), 16);
+		input->pagerank = (double *) _mm_malloc(input->NO*sizeof(double), 16);
+		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->NO, input->pagerank);
 	}
 	//precisione doppia
-	else if(input->G != NULL){
-		//TEST con grafo di piccole dimensioni
-		/*input->N = 4;
-		input->M = 6;
-		double m[4][4] = {{0,1,1,1},
-						  {1,0,1,0},
-						  {0,0,0,0},
-						  {1,0,0,0}};
-		input->G = (double *) m;*/
+	else if(!input->format && input->prec){
 		double *d = (double *)_mm_malloc(input->N*sizeof(double), 16);
-		get_outdegree_double(input->N, input->G, d, input->O);
-		double *P = get_matrix_P_double(input->N, input->G, d, input->O);
-		/*for(int i = 0; i < (input->N); i++){
-			for(int j = 0; j < (input->N); j++){
-				if(P[i*(input->N)+j] != 0){
-					printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
-				}
-			}
-		}*/
+		double *A = get_adiacency_matrix_double(input->N, input->M, input->G, &input->NO, d);
+		double *P = get_matrix_P_double(input->N, A, d, input->NO, input->c);
 		double e = 1/(double)input->N;
-		get_matrix_P_primo_double(input->N, P, d, input->O);
-		/*for(int i = 0; i < (input->N); i++){
-			for(int j = 0; j < (input->N); j++){
-				if(P[i*(input->N)+j] != 0){
-					printf("elemento P'[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
-				}
-			}
-		}*/
-		//double *v = get_v_double(input->N);
-		//double *E = get_matriceTeletrasporto_double(input->N, v);
-		get_matrix_P_secondo_double(input->N, P, input->c, input->O);
-		double* Pi0 =(double*)_mm_malloc((input->N+input->O)*sizeof(double),16);
-		/*for(int i = 0; i < (input->N); i++){
-			for(int j = 0; j < (input->N); j++){
-				printf("elemento P''[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
-			}
-		}*/
-		getVectorPiIn_double(input->N, e, input->O, Pi0);
-		input->pagerank = (double *)_mm_malloc((input->N+input->O)*sizeof(double), 16);
-		getPagerank_double(Pi0, input->pagerank, P, input->eps, input->N, input->O);
+		double* Pi0 =(double*)_mm_malloc(input->NO*sizeof(double),16);
+		getVectorPiIn_double(input->N, e, input->NO, Pi0);
+		input->pagerank = (double *)_mm_malloc(input->NO*sizeof(double), 16);
+		getPagerank_double(Pi0, input->pagerank, P, input->eps, input->N, input->NO);
 	}
 	//verifica formato dense
-	else{
-		/*
-		 * Seconda Parte Algoritmo
-		 */
-		//double *v = get_v_double(input->N);
+	else {
+		input->P = getMatrix(input->N, input->P, &input->NO);
 		double e = 1/(double)input->N;
-		double* Pi0 =(double*)_mm_malloc((input->N+input->O)*sizeof(double),16);
-		getVectorPiIn_double(input->N, e, input->O, Pi0);
-		input->pagerank = (double *)_mm_malloc((input->N+input->O)*sizeof(double), 16);
-		getPagerank_double(Pi0, input->pagerank, input->P, input->eps, input->N, input->O);
+		double* Pi0 =(double*)_mm_malloc(input->NO*sizeof(double),16);
+		getVectorPiIn_double(input->N, e, input->NO, Pi0);
+		input->pagerank = (double *)_mm_malloc(input->NO*sizeof(double), 16);
+		getPagerank_double(Pi0, input->pagerank, input->P, input->eps, input->N, input->NO);
 	}
+}
+/*
+ * Descrizione: costruisce una matrice di adiacenza a partire da una lista
+ * di struct location. Inoltre provvede a calcolare gli outdegree, che saranno
+ * contenuti nel vettore d.
+ */
 
-    //pagerank32(input); // Esempio di chiamata di funzione assembly
+float* get_adiacency_matrix_single(int n, int m, location *l, int *no, float *d){
+	//Padding che rende le colonne della matrice multiple di 16
+	/*Il padding comporta due benefici:
+	 * 1) Elimina il ciclo resto
+	 * 2) Elimina il ciclo quoziente nel loop unrolling
+	 * All'inizio le colonne della matrice erano multiple di 4 perchè
+	 * la loop vectorization prendeva 4 elementi per volta
+	 * Ora diventano multiple di 16 dato che l'unrolling prende 16 elementi per volta
+	 */
+	int o = 0;
+	int cols = n;
+	if(n % 16 != 0){
+		int a = n/16;
+		a = a*16;
+		int b = n-a;
+		o = 16-b;
+		cols+=o;
+	}
+	*no = cols;
+	/*
+	 * La dimensione della matrice s è n*(n+o)
+	 */
+	float* s = (float*)_mm_malloc(n*cols*sizeof(float), 16);
+	int i, j;
+	for(int k = 0; k < m; k++){
+		i = l[k].x-1;
+		j = l[k].y-1;
+		s[i*cols+j] = 1.0;
+		d[i]++;
+	}
+	return s;
+}
 
-    // -------------------------------------------------
+double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *d){
+	int o = 0;
+	int cols = n;
+	//Padding che rende le colonne della matrice multiple di 8 elementi
+	//Dato che il loop unrolling prende 8 elementi per volta
+	if(cols % 8 != 0){
+		int a = n/8;
+		a = a*8;
+		int b = n-a;
+		o = 8-b;
+		cols+=o;
+	}
+	*no = cols;
+	double* g = (double*)_mm_malloc(n*cols*sizeof(double),16);
+	int i, j;
+	for(int k = 0; k < m; k++){
+		i = l[k].x-1;
+		j = l[k].y-1;
+		g[i*cols+j] = 1.0;
+		d[i]++;
+	}
+	return g;
+}
 
+/*
+ * Descrizione: funzione che ricava una matrice le cui colonne
+ * sono multiple di 8, dato che la matrice in input potrebbe non esserlo.
+ */
+
+double* getMatrix(int n, double *P, int *no){
+		int cols = n;
+		int o = 0;
+		//Padding che rende le colonne della matrice multiple di 8 elementi
+		if(cols % 8 != 0){
+			int a = cols/8;
+			a = a*8;
+			int b = cols-a;
+			o = 8-b;
+			cols+=o;
+		}
+		*no = cols;
+		MATRIX nData = alloc_matrix(n,cols);
+		for(int i = 0; i < n; i++){
+			for(int j = 0; j < n; j++){
+				nData[i*cols+j] = P[i*n+j];
+			}
+		}
+		return nData;
 }
 
 /*
@@ -542,7 +410,7 @@ void pagerank(params* input) {
  * Uscita = vettore degli outdegree d
  */
 
-/*void get_outdegree_single(int n, float *A, float *d, int o){
+/*void get_outdegree_single(int n, float *A, float *d, int no){
 	//vettore di outdegree
 	for(int i = 0; i < n; i++){
 		int out = 0;
@@ -550,7 +418,7 @@ void pagerank(params* input) {
 			/*conta ogni volta che è presente un 1 nella riga i
 			 * corrisponde al numero di archi uscenti da i
 			*/
-			/*if(A[i*(n+o) + j]){
+			/*if(A[i*no + j]){
 				out++;
 			}
 		}
@@ -559,12 +427,12 @@ void pagerank(params* input) {
 	}
 }*/
 
-/*void get_outdegree_double(int n, double *A, double *d, int o){
+/*void get_outdegree_double(int n, double *A, double *d, int no){
 	//vettore di outdegree
 	for(int i = 0; i < n; i++){
 		int out = 0;
 		for(int j = 0; j < n; j++){
-			if(A[i*(n+o) + j]){
+			if(A[i*no + j]){
 				out++;
 			}
 		}
@@ -575,288 +443,184 @@ void pagerank(params* input) {
 
 /*
  * Descrizione = funzione che ricava la matrice delle probabilità
- * di transizione P, a partire dal vettore di outdegree (d) e dalla matrice di
- * adiacenza (A)
+ * di transizione P'', a partire dal vettore di outdegree (d) e dalla matrice di
+ * adiacenza (A).
  * Ingresso = dimesione matrice di adiacenza (n), matrice di adiacenza (A)
  * 				vettore di outdegree (d)
  * Uscita = matrice delle probabilità di transizione P = A/d
  */
 
-float* get_matrix_P_single(int n, float *A, float *d, int o){
+float* get_matrix_P_single(int n, float *A, float *d, int no, double c){
+	float e = (1-c)*(1/(float)n);
 	for(int i = 0; i < n; i++){
 		for(int j = 0; j < n; j++){
-			//la verifica serve per evitare divisioni inutili
-			if(A[i*(n+o) + j] != 0){
-				A[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
+			/*la verifica serve per evitare calcoli inutili
+			 * Dato che gli elementi con outdegree nullo sono
+			 * sostituiti con 1/n abbiamo che nel calcolo di P'':
+			 * P''[i][j] = c*(1/n) + (1-c)*(1/n) = 1/n
+			 * Quindi è possibile sostituire direttamente con 1/n
+			 */
+
+			if(d[i] != 0){
+				A[i*no + j] = A[i*no + j]/d[i];
+				A[i*no+j]=c*A[i*no+j] + e;
+			}
+			else{
+				A[i*no+j]= 1/(float)n;
 			}
 		}
 	}
 	return A;
 }
 
-double* get_matrix_P_double(int n, double *A, double *d, int o){
-	for(int i = 0; i < n; i++){
-		for(int j = 0; j < n; j++){
-			if(A[i*(n+o) + j] != 0){
-				A[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
+double* get_matrix_P_double(int n, double *A, double *d, int no, double c){
+		double e = (1-c)*(1/(double)n);
+		for(int i = 0; i < n; i++){
+			for(int j = 0; j < n; j++){
+				//la verifica serve per evitare divisioni inutili
+				if(d[i] != 0){
+					A[i*no + j] = A[i*no + j]/d[i];
+					A[i*no+j]=c*A[i*no+j] + e;
+				}
+				else{
+					A[i*no+j]= 1/(double)n;
+				}
 			}
 		}
-	}
-	return A;
+		return A;
 }
 
 /*
- * Descrizione = modifica la matrice P in modo che sia una
- * matrice di transizione P' valida.
- * Ingresso = dimensione matrice P (n), matrice di transizione (P), vettore degli
- * outdegree (d)
- * Post-Condizione = Matrice di transizione P valida
+ * Descrizione: vettore iniziale dei pagerank i cui elementi sono 1/n
  */
 
-void get_matrix_P_primo_single(int n, float *P, float *d, int o){
-	//verifica i nodi "i" che non hanno link di uscita
-	for(int i = 0; i < n; i++){
-		//se l'outdegree è nullo sostituisce la riga con v
-		if(d[i] == 0){
-			for(int j = 0; j < n; j++){
-				P[i*(n+o) + j] = 1/(float)n;
-			}
-		}
-	}
-}
-
-void get_matrix_P_primo_double(int n, double *P, double *d, int o){
-	//verifica i nodi "i" che non hanno link di uscita
-	for(int i = 0; i < n; i++){
-		if(d[i] == 0){
-			for(int j = 0; j < n; j++){
-				P[i*(n+o) + j] = 1/(double)n;
-			}
-		}
-	}
-}
-
-/*float* get_matriceTeletrasporto_single(int n, float *v){
-/*Dobbiamo ricavare la matrice E detta MATRICE DI TELETRASPORTO;
-	  * E è uguale al prodotto tra i 2 vettori u e v
-	  * vettore riga di personalizzazione -> v=(1/n,1/n,....,1/n)
-	  * u è un vettore colonna i cui elementi sono tutti 1 -> u=(1,1,....,1)^T(trasposto)
-	  * E sarà una matrice con un numero di righe pari agli elementi di u e un numero di colonne
-	  * pari agli elementi di v
-	  * */
-	/*int* u=(int*)_mm_malloc(n*sizeof(int),16);
-	for (int j=0;j<n;j++){
-		u[j]=1;
-	}
-
-	float* E=(float*)_mm_malloc(n*n*sizeof(float),16);
-		for(int i=0; i<n;i++){
-			for(int j=0;j<n;j++){
-				E[i*n+j]=u[i]*v[j];
-			}
-		}
-	return E;
-
-}*/
-
-/*double* get_matriceTeletrasporto_double(int n, double *v){
-/*Dobbiamo ricavare la matrice E detta MATRICE DI TELETRASPORTO;
-	  * E è uguale al prodotto tra i 2 vettori u e v
-	  * vettore riga di personalizzazione -> v=(1/n,1/n,....,1/n)
-	  * u è un vettore colonna i cui elementi sono tutti 1 -> u=(1,1,....,1)^T(trasposto)
-	  * E sarà una matrice con un numero di righe pari agli elementi di u e un numero di colonne
-	  * pari agli elementi di v
-	  * */
-
-	// int u[1][n];
-	/*int* u=(int*)_mm_malloc(n*sizeof(int),16);
-	for (int j=0;j<n;j++){
-		u[j]=1;
-	}
-
-	double* E=(double*)_mm_malloc(n*n*sizeof(double),16);
-		for(int i=0; i<n;i++){
-			for(int j=0;j<n;j++){
-				E[i*n+j]=u[i]*v[j];
-			}
-		}
-	return E;
-
-}*/
-
-/*float* get_v_single(int n){
-	float *v = (float*)_mm_malloc(n*sizeof(float),16);
-	for (int i=0; i <n;i++){
-		v[i]=1/(float)n;
-	}
-	return v;
-}
-
-double* get_v_double(int n){
-	double *v = (double*)_mm_malloc(n*sizeof(double),16);
-	for (int i=0; i <n;i++){
-		v[i]=1/(double)n;
-	}
-	return v;
-}*/
-
-void get_matrix_P_secondo_single(int n, float* P, double c, int o){
-
-	//float c= rand()/(float)RAND_MAX; <- non va scritto, viene dato da input
-	//float c=0.85;// il parametro deve poter variare
-	/*Andiamo a calcolare P'' a precisione singola seguendo la formula P''=cP'+(1-c)E
-		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
-		 * */
-	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
-
-	float e = (1-c)*(1/(float)n);
-	for(int i=0; i<n; i++){
-		for(int j=0; j<n; j++){
-			P[i*(n+o)+j]=c*P[i*(n+o)+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
-		}
-	}
-}
-
-void get_matrix_P_secondo_double(int n, double* P, double c, int o){
-	//double c= rand()/(double)RAND_MAX;
-
-	//double c=0.85; il parametro c deve poter variare
-	/*Andiamo a calcolare P'' a precisione singola seguendo la formula P''=cP'+(1-c)E
-		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
-		 * */
-	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
-	double e = (1-c)*(1/(double)n);
-	for(int i=0; i<n; i++){
-		for(int j=0; j<n; j++){
-			P[i*(n+o)+j]=c*P[i*(n+o)+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
-		}
-	}
-}
-
-/*void getVectorPiIn_single(int n, float e, int o, float *Pi){
+void getVectorPiIn_single(int n, float e, int no, float *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
-	for(int i = 0; i < o; i++){
+	/*for(int i = n; i < no; i++){
 		Pi[n+i] = 0;
-	}
-}*/
+	}*/
+}
 
-/*void getVectorPiIn_double(int n, double e, int o, double *Pi){
+void getVectorPiIn_double(int n, double e, int no, double *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
 	//Serve in assembly per evitare che ci sia 1/n al posto degli zeri di padding
-	for(int i = 0; i < o; i++){
+	/*for(int i = n; i < no; i++){
 		Pi[n+i] = 0;
-	}
-}*/
+	}*/
+}
 
-/*void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o){
+/*
+ * descrizione: funzione che esegue il prototto Pik = (P'')'*Pi0
+ * Dove Pi0 è il vettore dei pagerank all'iterazione precedente.
+ * Invece di calcolare la trasversa di P'' si scegli di considerare
+ * direttamente le sue colonne.
+ */
+
+void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
-			Pik[i] += P[j*(n+o) + i]*Pi0[j];
+			Pik[i] += P[j*no + i]*Pi0[j];
 		}
 	}
-}*/
+}
 
-/*void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o){
+void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
-			Pik[i] += P[j*(n+o) + i]*Pi0[j];
+			Pik[i] += P[j*no + i]*Pi0[j];
 		}
 	}
-}*/
+}
 
-/*void getPagrnk_single(int n, float *Pik){
+/*
+ * Descrizione: serve a calcolare i valori finali di pagerank
+ */
+
+void getPagrnk_single(int n, float *Pik){
 	float somma = 0;
 	for(int i = 0; i < n; i++)
 		somma += fabsf(Pik[i]);
 	for(int i = 0; i < n; i++)
 		Pik[i] = Pik[i]/(float)somma;
-}*/
+}
 
-/*void getPagrnk_double(int n, double *Pik){
+void getPagrnk_double(int n, double *Pik){
 	double somma = 0;
 	for(int i = 0; i < n; i++)
 		somma += fabs(Pik[i]);
 	for(int i = 0; i < n; i++)
 		Pik[i] = Pik[i]/(double)somma;
-}*/
+}
 
-/*void getDelta_single(float *Pi0, float *Pik, int n, float *delta){
+/*
+ * Descrizione: si occupa di calcolare il delta delta = ||Pi(k) - Pi(k+1)||1
+ * fatto ciò aggiorna gli elementi dell'iterazione precedente con quelli
+ * dell'iterazione corrente.
+ */
+
+void getDelta_single(float *Pi0, float *Pik, int n, float *delta){
 	for(int i = 0; i < n; i++){
-			*delta += fabsf(Pi0[i]-Pik[i]);
-			Pi0[i] = Pik[i];
+		*delta += fabsf(Pi0[i]-Pik[i]);
+		Pi0[i] = Pik[i];
 	}
-}*/
+}
 
-/*void getDelta_double(double *Pi0, double *Pik, int n, double *delta){
+void getDelta_double(double *Pi0, double *Pik, int n, double *delta){
 	for(int i = 0; i < n; i++){
-			*delta += fabs(Pi0[i]-Pik[i]);
-			Pi0[i] = Pik[i];
+		*delta += fabs(Pi0[i]-Pik[i]);
+		Pi0[i] = Pik[i];
 	}
-}*/
+}
 
-/*void cvtPagerank(int n, float *Pik, double *Piconv){
+/*
+ * Descrizione: converte i pagerank da float a double
+ */
+
+void cvtPagerank(int n, float *Pik, double *Piconv){
 	for(int i = 0; i < n; i++){
 		Piconv[i] = (double) Pik[i];
 	}
-}*/
+}
+
+/*
+ * Descrizione: esegue il calcolo del delta e del vettore dei pagerank finchè delta > eps
+ */
 
 
-void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, double *Piconv){
-	int stop = 0;
+void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int no, double *Piconv){
 	float delta = 0;
-	while(!stop){
-		getVectorPik_single(P, Pi0, Pik, n, o);
+	getVectorPik_single(P, Pi0, Pik, n, no);
+	getDelta_single(Pi0, Pik, n, &delta);
+	while(delta > eps){
+		getVectorPik_single(P, Pi0, Pik, n, no);
 		/*
 		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 		 */
 		delta = 0;
 		getDelta_single(Pi0, Pik, n, &delta);
-		//printf("delta = %f\n", delta);
-		/*
-		 * Se il valore delta calcolato è minore di epsilon
-		 * allora siamo arrivati all'iterazione che ci fa ottenere
-		 * il vettore dei pagerank. Altrimenti si aggiorna Pi0 che conterrà
-		 * l'iterazione attuale e si esegue un'altra iterazione.
-		 */
-		if(delta < eps){
-			stop = 1;
-			break;
-		}
 	}
 	getPagrnk_single(n,Pik);
 	cvtPagerank(n, Pik, Piconv);
 }
 
-void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o){
-	int stop = 0;
+void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int no){
+
 	double delta = 0;
-	while(!stop){
-		getVectorPik_double(P, Pi0, Pik, n, o);
+	getVectorPik_double(P, Pi0, Pik, n, no);
+	getDelta_double(Pi0, Pik, n, &delta);
+	while(delta > eps){
+		getVectorPik_double(P, Pi0, Pik, n, no);
 		/*
 		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 		 */
 		delta = 0;
 		getDelta_double(Pi0, Pik, n, &delta);
-		//printf("delta = %.14f\n",delta);
-		/*
-		 * Se il valore delta calcolato è minore di epsilon
-		 * allora siamo arrivati all'iterazione che ci fa ottenere
-		 * il vettore dei pagerank. Altrimenti si aggiorna Pi0 che conterrà
-		 * l'iterazione attuale e si esegue un'altra iterazione.
-		 */
-		/*
-		 * Aggiorna i valori della corrente iterazione
-		 */
-		if(delta < eps){
-			stop = 1;
-			break;
-		}
 	}
 	getPagrnk_double(n,Pik);
 }
@@ -880,8 +644,7 @@ int main(int argc, char** argv) {
 	 */
 	input->file_name = NULL;
 	input->P = NULL; // dense format
-	input->G = NULL; // sparse double format
-	input->S = NULL; // sparse single format
+	input->G = NULL; // sparse format
 	input->N = 0; // number of nodes
 	input->M = 0; // number of arcs
 	input->c = 0.85;
@@ -961,14 +724,10 @@ int main(int argc, char** argv) {
 		exit(1);
 	}
 	
-	if (input->format == 0){
-		if(input->prec == SINGLE)
-			input->S = load_sparse_single(input->file_name, &input->N, &input->M, &input->O);
-		else
-			input->G = load_sparse_double(input->file_name, &input->N, &input->M, &input->O);
-	}
+	if (input->format == 0)
+		input->G = load_sparse(input->file_name, &input->N, &input->M);
 	else
-		input->P = load_dense(input->file_name, &input->N, &input->M, &input->O);
+		input->P = load_dense(input->file_name, &input->N, &input->M);
 		
 	if (!input->silent) {
 		printf("Input file name: '%s'\n", input->file_name);
