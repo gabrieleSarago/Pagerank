@@ -84,7 +84,7 @@ typedef struct {
 	GRAPH G; // codifica full (sparse) double
 	int N; // numero di nodi
 	int M; // numero di archi
-	int O; // padding
+	int NO; // padding
 	double c; // default=0.85
 	double eps; // default=1e-5
 	int format; // 0=sparse, 1=full
@@ -261,33 +261,27 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
  */
 //extern void pagerank32(params* input);
 
-float*	get_adiacency_matrix_single(int n, int m, location *l, int *o,  int *cnz, int *cz, int *z, int *nz);
-void get_outdegree_single(int n, int cnz, float *A, float* d, int o);
-float* get_matrix_P_single(int n, int cnz, float *A, float *d, int o);
-void get_matrix_P_primo_single(int n, int cnz, float *P, float *d, int o);
-void get_matrix_P_secondo_single(int n, int cnz, float *P, double c, int o);
-void getVectorPiIn_single(int n, float e, int o, float *Pi);
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o, int cnz, int cz, int *nz, int *z);
+float*	get_adiacency_matrix_single(int n, int m, location *l, int *no,  int *cnz, int *cz, int *z, int *nz);
+void get_outdegree_single(int n, int cnz, float *A, float* d, int no);
+float* get_matrix_P_single(int n, int cnz, float *A, float *d, double c, int no);
+void getVectorPiIn_single(int n, float e, int no, float *Pi);
+void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no, int cnz, int cz, int *nz, int *z);
 void getPagrnk_single(int n, float *Pik);
 void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
 void cvtPagerank(int n, float *Pik, double *Piconv);
-void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, int cnz, int cz, int *nz, int *z, double *Piconv);
+void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int no, int cnz, int cz, int *nz, int *z, double *Piconv);
 
-double* getMatrix(int n, double *P, int *o);
-double* get_adiacency_matrix_double(int n, int m, location *l, int *o,  int *cnz, int *cz, int *z, int *nz);
-void get_outdegree_double(int n, int cnz, double *A, double* d, int o);
-double* get_matrix_P_double(int n, int cnz, double *A, double *d, int o);
-void get_matrix_P_primo_double(int n, int cnz, double *P, double *d, int o);
-//double* get_matriceTeletrasporto_double(int n, double *v);
-void get_matrix_P_secondo_double(int n, int cnz, double *P, double c, int o);
-void getVectorPiIn_double(int n, double e, int o, double *Pi);
-//double* get_v_double(int n);
-void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o, int cnz, int cz, int *nz, int *z);
-void getVectorPik_dense(double *P, double *Pi0, double *Pik, int n, int o);
+double* getMatrix(int n, double *P, int *no);
+double* get_adiacency_matrix_double(int n, int m, location *l, int *no,  int *cnz, int *cz, int *z, int *nz);
+void get_outdegree_double(int n, int cnz, double *A, double* d, int no);
+double* get_matrix_P_double(int n, int cnz, double *A, double *d, double c, int no);
+void getVectorPiIn_double(int n, double e, int no, double *Pi);
+void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no, int cnz, int cz, int *nz, int *z);
+void getVectorPik_dense(double *P, double *Pi0, double *Pik, int n, int no);
 void getPagrnk_double(int n, double *Pik);
 void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
-void getPagerank_dense(double *Pi0, double *Pik, double *P, double eps, int n, int o);
-void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o, int cnz, int cz, int *nz, int *z);
+void getPagerank_dense(double *Pi0, double *Pik, double *P, double eps, int n, int no);
+void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int no, int cnz, int cz, int *nz, int *z);
 
 /*
  *	pagerank
@@ -318,20 +312,11 @@ void pagerank(params* input) {
 		int *z = (int *)_mm_malloc(input->N*sizeof(int), 16);
 		int cnz = 0;
 		int cz = 0;
-		float *A = get_adiacency_matrix_single(input->N, input->M, input->G, &input->O, &cnz, &cz, z, nz);
+		float *A = get_adiacency_matrix_single(input->N, input->M, input->G, &input->NO, &cnz, &cz, z, nz);
 		float *d = (float *)_mm_malloc(cnz*sizeof(float), 16);
-		get_outdegree_single(input->N, cnz, A, d, input->O);
+		get_outdegree_single(input->N, cnz, A, d, input->NO);
 		//matrice P
-		float *P = get_matrix_P_single(input->N, cnz, A, d, input->O);
-
-		//TEST matrice P
-		//Basta sostituire P con input->S per testare la matrice di adiacenza.
-		/*for(int i = 0; i < (input->N); i++){
-			for(int j = 0; j < (input->N); j++){
-				printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
-			}
-		}*/
-
+		float *P = get_matrix_P_single(input->N, cnz, A, d, input->c, input->NO);
 		/*
 		 * 2° step: passare dalla matrice P a una matrice di transizione valida P'
 		 * data da P'[i][j] >= 0 e somma(P'[i]) = 1.
@@ -353,14 +338,12 @@ void pagerank(params* input) {
 		 * di transizione valida.
 		 */
 		//get_matrix_P_primo_single(input->N, P, d, input->O);
-		//float *v = get_v_single(input->N);
-		//float *E = get_matriceTeletrasporto_single(input->N, v);
-		get_matrix_P_secondo_single(input->N, cnz, P, input->c, input->O);
-		float* Pi0 =(float*)_mm_malloc((input->N+input->O)*sizeof(float),16);
-		getVectorPiIn_single(input->N, e, input->O, Pi0);
-		float *Pik = (float *)_mm_malloc((input->N+input->O)*sizeof(float), 16);
-		input->pagerank = (double *) _mm_malloc((input->N+input->O)*sizeof(double), 16);
-		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->O, cnz, cz, nz, z, input->pagerank);
+		//get_matrix_P_secondo_single(input->N, cnz, P, input->c, input->NO);
+		float* Pi0 =(float*)_mm_malloc(input->NO*sizeof(float),16);
+		getVectorPiIn_single(input->N, e, input->NO, Pi0);
+		float *Pik = (float *)_mm_malloc(input->NO*sizeof(float), 16);
+		input->pagerank = (double *) _mm_malloc(input->NO*sizeof(double), 16);
+		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->NO, cnz, cz, nz, z, input->pagerank);
 	}
 	//precisione doppia
 	else if(!input->format && input->prec){
@@ -368,37 +351,26 @@ void pagerank(params* input) {
 		int *z = (int *)_mm_malloc(input->N*sizeof(int), 16);
 		int cnz = 0;
 		int cz = 0;
-		double *A = get_adiacency_matrix_double(input->N, input->M, input->G, &input->O, &cnz, &cz, z, nz);
-		double *d = (double *)_mm_malloc(input->N*sizeof(double), 16);
-		get_outdegree_double(input->N, cnz, A, d, input->O);
-		double *P = get_matrix_P_double(input->N, cnz, A, d, input->O);
-		/*for(int i = 0; i < (input->N); i++){
-			for(int j = 0; j < (input->N); j++){
-				if(P[i*(input->N)+j] != 0){
-					printf("elemento P[%d][%d] = %f\n", i, j, P[i*(input->N)+j]);
-				}
-			}
-		}*/
+		double *A = get_adiacency_matrix_double(input->N, input->M, input->G, &input->NO, &cnz, &cz, z, nz);
+		double *d = (double *)_mm_malloc(cnz*sizeof(double), 16);
+		get_outdegree_double(input->N, cnz, A, d, input->NO);
+		double *P = get_matrix_P_double(input->N, cnz, A, d, input->c, input->NO);
 		double e = 1/(double)input->N;
 		//get_matrix_P_primo_double(input->N, cnz, P, d, input->O);
-		get_matrix_P_secondo_double(input->N, cnz, P, input->c, input->O);
-		double* Pi0 =(double*)_mm_malloc((input->N+input->O)*sizeof(double),16);
-		getVectorPiIn_double(input->N, e, input->O, Pi0);
-		input->pagerank = (double *)_mm_malloc((input->N+input->O)*sizeof(double), 16);
-		getPagerank_double(Pi0, input->pagerank, P, input->eps, input->N, input->O, cnz, cz, nz, z);
+		//get_matrix_P_secondo_double(input->N, cnz, P, input->c, input->NO);
+		double* Pi0 =(double*)_mm_malloc(input->NO*sizeof(double),16);
+		getVectorPiIn_double(input->N, e, input->NO, Pi0);
+		input->pagerank = (double *)_mm_malloc(input->NO*sizeof(double), 16);
+		getPagerank_double(Pi0, input->pagerank, P, input->eps, input->N, input->NO, cnz, cz, nz, z);
 	}
 	//verifica formato dense
-	else {
-		/*
-		 * Seconda Parte Algoritmo
-		 */
-		//double *v = get_v_double(input->N);
-		input->P = getMatrix(input->N, input->P, &input->O);
+	else{
+		input->P = getMatrix(input->N, input->P, &input->NO);
 		double e = 1/(double)input->N;
-		double* Pi0 =(double*)_mm_malloc((input->N+input->O)*sizeof(double),16);
-		getVectorPiIn_double(input->N, e, input->O, Pi0);
-		input->pagerank = (double *)_mm_malloc((input->N+input->O)*sizeof(double), 16);
-		getPagerank_dense(Pi0, input->pagerank, input->P, input->eps, input->N, input->O);
+		double* Pi0 =(double*)_mm_malloc(input->NO*sizeof(double),16);
+		getVectorPiIn_double(input->N, e, input->NO, Pi0);
+		input->pagerank = (double *)_mm_malloc(input->NO*sizeof(double), 16);
+		getPagerank_dense(Pi0, input->pagerank, input->P, input->eps, input->N, input->NO);
 	}
 
     //pagerank32(input); // Esempio di chiamata di funzione assembly
@@ -420,13 +392,7 @@ int getRow(int i, int *nz, int cnz){
 	return -1;
 }
 
-float* get_adiacency_matrix_single(int n, int m, location *l, int *o, int *cnz, int *cz, int *z, int *nz){
-	/*
-	* Matrice di adiacenza n*n, dove n è il numero di nodi
-	* il puntatore g punta a un blocco di memoria di nodes*nodes elementi
-	* dove ogni elemento occupa 4 byte. In questo momento la matrice contiene solo
-	* 0 e 1, ma in seguito il risultato sarà la matrice P, che è una matrice di double.
-	*/
+float* get_adiacency_matrix_single(int n, int m, location *l, int *no, int *cnz, int *cz, int *z, int *nz){
 	//Padding che rende le colonne della matrice multiple di 16
 	/*Il padding comporta due benefici:
 	 * 1) Elimina il ciclo resto
@@ -435,15 +401,16 @@ float* get_adiacency_matrix_single(int n, int m, location *l, int *o, int *cnz, 
 	 * la loop vectorization prendeva 4 elementi per volta
 	 * Ora diventano multiple di 16 dato che l'unrolling prende 16 elementi per volta
 	 */
-	*o = 0;
+	int o = 0;
 	int cols = n;
 	if(n % 16 != 0){
 		int a = n/16;
 		a = a*16;
 		int b = n-a;
-		*o = 16-b;
-		cols+=*o;
+		o = 16-b;
+		cols+=o;
 	}
+	*no = cols;
 	//contatore elementi nulli
 	*cz = 0;
 	//contatore elementi non nulli
@@ -491,8 +458,8 @@ float* get_adiacency_matrix_single(int n, int m, location *l, int *o, int *cnz, 
 	return s;
 }
 
-double* get_adiacency_matrix_double(int n, int m, location *l, int *o, int *cnz, int *cz, int *z, int *nz){
-	*o = 0;
+double* get_adiacency_matrix_double(int n, int m, location *l, int *no, int *cnz, int *cz, int *z, int *nz){
+	int o = 0;
 	int cols = n;
 	//Padding che rende le colonne della matrice multiple di 8 elementi
 	//Dato che il loop unrolling prende 8 elementi per volta
@@ -500,9 +467,10 @@ double* get_adiacency_matrix_double(int n, int m, location *l, int *o, int *cnz,
 		int a = n/8;
 		a = a*8;
 		int b = n-a;
-		*o = 8-b;
-		cols+=*o;
+		o = 8-b;
+		cols+=o;
 	}
+	*no = cols;
 	int trovato = 0;
 	/*
 	 * Per ogni nodo si va a vedere se ha archi in uscita
@@ -546,17 +514,18 @@ double* get_adiacency_matrix_double(int n, int m, location *l, int *o, int *cnz,
 	return s;
 }
 
-double* getMatrix(int n, double *P, int *o){
+double* getMatrix(int n, double *P, int *no){
 		int cols = n;
-		*o = 0;
+		int o = 0;
 		//Padding che rende le colonne della matrice multiple di 8 elementi
 		if(cols % 8 != 0){
 			int a = cols/8;
 			a = a*8;
 			int b = cols-a;
-			*o = 8-b;
-			cols+=*o;
+			o = 8-b;
+			cols+=o;
 		}
+		*no = cols;
 		MATRIX nData = alloc_matrix(n,cols);
 		for(int i = 0; i < n; i++){
 			for(int j = 0; j < n; j++){
@@ -572,7 +541,7 @@ double* getMatrix(int n, double *P, int *o){
  * Uscita = vettore degli outdegree d
  */
 
-void get_outdegree_single(int n, int cnz, float *A, float *d, int o){
+void get_outdegree_single(int n, int cnz, float *A, float *d, int no){
 	//vettore di outdegree
 	for(int i = 0; i < cnz; i++){
 		int out = 0;
@@ -580,26 +549,26 @@ void get_outdegree_single(int n, int cnz, float *A, float *d, int o){
 			/*conta ogni volta che è presente un 1 nella riga i
 			 * corrisponde al numero di archi uscenti da i
 			*/
-			if(A[i*(n+o) + j]){
+			if(A[i*no + j]){
 				out++;
 			}
 		}
 		//inserisce l'outdegree nel vettore d
-		*(d+i) = out;
+		d[i] = out;
 	}
 }
 
-void get_outdegree_double(int n, int cnz, double *A, double *d, int o){
+void get_outdegree_double(int n, int cnz, double *A, double *d, int no){
 	//vettore di outdegree
 	for(int i = 0; i < cnz; i++){
 		int out = 0;
 		for(int j = 0; j < n; j++){
-			if(A[i*(n+o) + j]){
+			if(A[i*no + j]){
 				out++;
 			}
 		}
-		//inserisce l'outdegree nel vettore
-		*(d+i) = out;
+		//inserisce l'outdegree nel vettore d
+		d[i] = out;
 	}
 }
 
@@ -612,87 +581,31 @@ void get_outdegree_double(int n, int cnz, double *A, double *d, int o){
  * Uscita = matrice delle probabilità di transizione P = A/d
  */
 
-float* get_matrix_P_single(int n, int cnz, float *A, float *d, int o){
+float* get_matrix_P_single(int n, int cnz, float *A, float *d, double c, int no){
+	float e = (1-c)*(1/(float)n);
 	for(int i = 0; i < cnz; i++){
 		for(int j = 0; j < n; j++){
 			//la verifica serve per evitare divisioni inutili
-			if(A[i*(n+o) + j] != 0){
-				A[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
+			if(A[i*no + j] != 0){
+				A[i*no + j] = A[i*no + j]/d[i];
 			}
+			A[i*no + j] = c*A[i*no + j] + e;
 		}
 	}
 	return A;
 }
 
-double* get_matrix_P_double(int n, int cnz, double *A, double *d, int o){
+double* get_matrix_P_double(int n, int cnz, double *A, double *d, double c, int no){
+	double e = (1-c)*(1/(double)n);
 	for(int i = 0; i < cnz; i++){
 		for(int j = 0; j < n; j++){
-			if(A[i*(n+o) + j] != 0){
-				A[i*(n+o) + j] = A[i*(n+o) + j]/d[i];
+			if(A[i*no + j] != 0){
+				A[i*no + j] = A[i*no + j]/d[i];
 			}
+			A[i*no + j] = c*A[i*no + j] + e;
 		}
 	}
 	return A;
-}
-
-/*
- * Descrizione = modifica la matrice P in modo che sia una
- * matrice di transizione P' valida.
- * Ingresso = dimensione matrice P (n), matrice di transizione (P), vettore degli
- * outdegree (d)
- * Post-Condizione = Matrice di transizione P valida
- */
-
-void get_matrix_P_primo_single(int n, int cnz, float *P, float *d, int o){
-	//verifica i nodi "i" che non hanno link di uscita
-	for(int i = 0; i < cnz; i++){
-		//se l'outdegree è nullo sostituisce la riga con v
-		if(d[i] == 0){
-			for(int j = 0; j < n; j++){
-				P[i*(n+o) + j] = 1/(float)n;
-			}
-		}
-	}
-}
-
-void get_matrix_P_primo_double(int n, int cnz, double *P, double *d, int o){
-	//verifica i nodi "i" che non hanno link di uscita
-	for(int i = 0; i < cnz; i++){
-		if(d[i] == 0){
-			for(int j = 0; j < n; j++){
-				P[i*(n+o) + j] = 1/(double)n;
-			}
-		}
-	}
-}
-
-void get_matrix_P_secondo_single(int n, int cnz, float* P, double c, int o){
-
-	/*Andiamo a calcolare P'' a precisione singola seguendo la formula P''=cP'+(1-c)E
-		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
-		 * */
-	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
-
-	float e = (1-c)*(1/(float)n);
-	for(int i=0; i<cnz; i++){
-		for(int j=0; j<n; j++){
-			P[i*(n+o)+j]=c*P[i*(n+o)+j] + e;// P2[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
-		}
-	}
-}
-
-void get_matrix_P_secondo_double(int n, int cnz, double* P, double c, int o){
-
-	/*Andiamo a calcolare P'' a precisione singola seguendo la formula P''=cP'+(1-c)E
-		 * dove c è un valore compreso tra [0,1] che noi considereremo pari a 0.85
-		 * */
-	/*Andiamo a calcolare separatamente c*P' e (1-c)*E per poi andare a sommare i risultati*/
-	double e = (1-c)*(1/(double)n);
-	for(int i=0; i<cnz; i++){
-		for(int j=0; j<n; j++){
-			P[i*(n+o)+j]=c*P[i*(n+o)+j] + e;// P1[i*n+j]=c*P1[i*n+j] + (1-c)*(1/n);
-		}
-	}
 }
 
 void getVectorPiIn_single(int n, float e, int o, float *Pi){
@@ -705,7 +618,7 @@ void getVectorPiIn_single(int n, float e, int o, float *Pi){
 	}*/
 }
 
-void getVectorPiIn_double(int n, double e, int o, double *Pi){
+void getVectorPiIn_double(int n, double e, int no, double *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
@@ -715,11 +628,11 @@ void getVectorPiIn_double(int n, double e, int o, double *Pi){
 	}*/
 }
 
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o, int cnz, int cz, int *nz, int *z){
+void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no, int cnz, int cz, int *nz, int *z){
 	for(int i = 0; i < cnz; i++){
 		Pik[nz[i]] = 0;
 		for(int j = 0; j < cnz; j++){
-			Pik[nz[i]] += P[j*(n+o)+nz[i]]*Pi0[nz[j]];
+			Pik[nz[i]] += P[j*no+nz[i]]*Pi0[nz[j]];
 		}
 		for(int j = 0; j < cz; j++){
 			Pik[nz[i]] += (1/(float)n)*Pi0[z[j]];
@@ -728,7 +641,7 @@ void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o, int cnz
 	for(int i = 0; i < cz; i++){
 		Pik[z[i]] = 0;
 		for(int j = 0; j < cnz; j++){
-			Pik[z[i]] += P[j*(n+o)+z[i]]*Pi0[nz[j]];
+			Pik[z[i]] += P[j*no+z[i]]*Pi0[nz[j]];
 		}
 		for(int j = 0; j < cz; j++){
 			Pik[z[i]] += (1/(float)n)*Pi0[z[j]];
@@ -736,11 +649,11 @@ void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int o, int cnz
 	}
 }
 
-void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o, int cnz, int cz, int *nz, int *z){
+void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no, int cnz, int cz, int *nz, int *z){
 	for(int i = 0; i < cnz; i++){
 			Pik[nz[i]] = 0;
 			for(int j = 0; j < cnz; j++){
-				Pik[nz[i]] += P[j*(n+o)+nz[i]]*Pi0[nz[j]];
+				Pik[nz[i]] += P[j*no+nz[i]]*Pi0[nz[j]];
 			}
 			for(int j = 0; j < cz; j++){
 				Pik[nz[i]] += (1/(double)n)*Pi0[z[j]];
@@ -749,7 +662,7 @@ void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o, int 
 		for(int i = 0; i < cz; i++){
 			Pik[z[i]] = 0;
 			for(int j = 0; j < cnz; j++){
-				Pik[z[i]] += P[j*(n+o)+z[i]]*Pi0[nz[j]];
+				Pik[z[i]] += P[j*no+z[i]]*Pi0[nz[j]];
 			}
 			for(int j = 0; j < cz; j++){
 				Pik[z[i]] += (1/(double)n)*Pi0[z[j]];
@@ -757,11 +670,11 @@ void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int o, int 
 		}
 }
 
-void getVectorPik_dense(double *P, double *Pi0, double *Pik, int n, int o){
+void getVectorPik_dense(double *P, double *Pi0, double *Pik, int n, int no){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
-			Pik[i] += P[j*(n+o) + i]*Pi0[j];
+			Pik[i] += P[j*no + i]*Pi0[j];
 		}
 	}
 }
@@ -803,7 +716,7 @@ void cvtPagerank(int n, float *Pik, double *Piconv){
 }
 
 
-void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int o, int cnz, int cz, int *nz, int *z, double *Piconv){
+void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int no, int cnz, int cz, int *nz, int *z, double *Piconv){
 	/*
 	 * Se il valore delta calcolato è minore di epsilon
 	 * allora siamo arrivati all'iterazione che ci fa ottenere
@@ -811,10 +724,10 @@ void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int
 	 * l'iterazione attuale e si esegue un'altra iterazione.
 	 */
 	float delta = 0;
-	getVectorPik_single(P, Pi0, Pik, n, o, cnz, cz, nz, z);
+	getVectorPik_single(P, Pi0, Pik, n, no, cnz, cz, nz, z);
 	getDelta_single(Pi0, Pik, n, &delta);
 	while(delta > eps){
-		getVectorPik_single(P, Pi0, Pik, n, o, cnz, cz, nz, z);
+		getVectorPik_single(P, Pi0, Pik, n, no, cnz, cz, nz, z);
 		/*
 		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 		 */
@@ -825,7 +738,7 @@ void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int
 	cvtPagerank(n, Pik, Piconv);
 }
 
-void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int o, int cnz, int cz, int *nz, int *z){
+void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int no, int cnz, int cz, int *nz, int *z){
 	/*
 		 * Se il valore delta calcolato è minore di epsilon
 		 * allora siamo arrivati all'iterazione che ci fa ottenere
@@ -833,10 +746,10 @@ void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, 
 		 * l'iterazione attuale e si esegue un'altra iterazione.
 		 */
 		double delta = 0;
-		getVectorPik_double(P, Pi0, Pik, n, o, cnz, cz, nz, z);
+		getVectorPik_double(P, Pi0, Pik, n, no, cnz, cz, nz, z);
 		getDelta_double(Pi0, Pik, n, &delta);
 		while(delta > eps){
-			getVectorPik_double(P, Pi0, Pik, n, o, cnz, cz, nz, z);
+			getVectorPik_double(P, Pi0, Pik, n, no, cnz, cz, nz, z);
 			/*
 			 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 			 */
@@ -847,7 +760,7 @@ void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, 
 }
 
 
-void getPagerank_dense(double *Pi0, double *Pik, double *P, double eps, int n, int o){
+void getPagerank_dense(double *Pi0, double *Pik, double *P, double eps, int n, int no){
 	/*
 	 * Se il valore delta calcolato è minore di epsilon
 	 * allora siamo arrivati all'iterazione che ci fa ottenere
@@ -855,10 +768,10 @@ void getPagerank_dense(double *Pi0, double *Pik, double *P, double eps, int n, i
 	 * l'iterazione attuale e si esegue un'altra iterazione.
 	 */
 	double delta = 0;
-	getVectorPik_dense(P, Pi0, Pik, n, o);
+	getVectorPik_dense(P, Pi0, Pik, n, no);
 	getDelta_double(Pi0, Pik, n, &delta);
 	while(delta > eps){
-		getVectorPik_dense(P, Pi0, Pik, n, o);
+		getVectorPik_dense(P, Pi0, Pik, n, no);
 		/*
 		 * Calcolo del valore delta = ||Pi(k) - Pi(k+1)||1
 		 */
