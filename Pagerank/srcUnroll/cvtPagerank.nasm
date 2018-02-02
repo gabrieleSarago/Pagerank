@@ -2,11 +2,8 @@
 %include "sseutils.nasm"
 
 section .data
-	align	16
 	n	equ	8
-	align	16
 	pik	equ	12
-	align	16
 	pic	equ	16
 
 section	.text

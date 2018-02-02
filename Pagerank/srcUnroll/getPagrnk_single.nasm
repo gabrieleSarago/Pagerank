@@ -1,10 +1,18 @@
-
+;float somma = 0
+;for(int i = 0; i < (n+o); i+= u*p){
+;	somma += fabsf(Pik[i...i+p-1]);
+;	...
+;	somma += fabsf(Pik[i+u*p...i+(u+1)*p-1]);
+;}
+;for(int i = 0; i < (n+o); i+=u*p){
+;	Pi0[i...i+p-1] = Pik[i...i+p-1]/(float) somma
+;	...
+;	Pi0[i+u*p...i+(u+1)*p-1] = Pik[i+u*p...i+(u+1)*p-1]/(float) somma;
+;}
 %include "sseutils.nasm"
 
 section .data
-	align	16
 	n	equ	8
-	align	16
 	pik	equ	12
 	align	16
 	m	dd	0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff

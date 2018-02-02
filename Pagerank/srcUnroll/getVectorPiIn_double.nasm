@@ -2,13 +2,9 @@
 %include "sseutils.nasm"
 
 section .data
-	align	16
 	n	equ	8
-	align	16
 	e	equ	12
-	align	16
-	o	equ	20
-	align	16
+	no	equ	20
 	pi	equ	24
 section	.text
 	global	getVectorPiIn_double
@@ -18,7 +14,7 @@ getVectorPiIn_double:
 	pushad
 	mov	edi, [ebp+n]
 	mov	ecx, [ebp+pi]
-	mov	eax, [ebp+o]
+	mov	eax, [ebp+no]
 	movsd	xmm1, [ebp+e]
 	shufpd	xmm1, xmm1, 0
 	xor	esi, esi
@@ -33,13 +29,15 @@ cicloi:
 	jmp	cicloi
 finecicloi:
 	xor	esi, esi
-	imul	edi, 8		;n*8
-	add	ecx, edi	;Pi+n*8
+	mov	ebx, edi
+	imul	ebx, 8		;n*8
+	add	ecx, ebx	;Pi+n*8
 	xorps	xmm0, xmm0
 cicloo:
-	cmp	esi, eax
+	cmp	edi, eax
 	jge	finecicloo
 	movss	[ecx+esi*8], xmm0	;Pi[n*8+i*8] = 0
+	inc	edi	
 	inc	esi
 	jmp	cicloo
 finecicloo:

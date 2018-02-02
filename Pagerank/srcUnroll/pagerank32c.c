@@ -226,20 +226,20 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 
 float* get_adiacency_matrix_single(int n, int m, location *l, int *no, float *d);
 float* get_matrix_P_single(int n, float *A, float *d, int no, double c);
-void getVectorPiIn_single(int n, float e, int o, float *Pi);
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no);
-void getPagrnk_single(int n, float *Pik);
-void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
-void cvtPagerank(int n, float *Pik, double *Piconv);
+extern void getVectorPiIn_single(int n, float e, int no, float *Pi);
+extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no);
+extern void getPagrnk_single(int n, float *Pik);
+extern void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
+extern void cvtPagerank(int n, float *Pik, double *Piconv);
 void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int no, double *Piconv);
 
 double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *d);
 double* getMatrix(int n, double *P, int *no);
 double* get_matrix_P_double(int n, double *A, double *d, int no, double c);
-void getVectorPiIn_double(int n, double e, int no, double *Pi);
-void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no);
-void getPagrnk_double(int n, double *Pik);
-void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
+extern void getVectorPiIn_double(int n, double e, int no, double *Pi);
+extern void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no);
+extern void getPagrnk_double(int n, double *Pik);
+extern void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
 void getPagerank_double(double *Pi0, double *Pik, double *P, double eps, int n, int no);
 
 
@@ -494,24 +494,24 @@ double* get_matrix_P_double(int n, double *A, double *d, int no, double c){
  * Descrizione: vettore iniziale dei pagerank i cui elementi sono 1/n
  */
 
-void getVectorPiIn_single(int n, float e, int no, float *Pi){
+/*void getVectorPiIn_single(int n, float e, int no, float *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
 	/*for(int i = n; i < no; i++){
 		Pi[n+i] = 0;
-	}*/
-}
+	}
+}*/
 
-void getVectorPiIn_double(int n, double e, int no, double *Pi){
+/*void getVectorPiIn_double(int n, double e, int no, double *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
 	//Serve in assembly per evitare che ci sia 1/n al posto degli zeri di padding
 	/*for(int i = n; i < no; i++){
 		Pi[n+i] = 0;
-	}*/
-}
+	}
+}*/
 
 /*
  * descrizione: funzione che esegue il prototto Pik = (P'')'*Pi0
@@ -520,7 +520,7 @@ void getVectorPiIn_double(int n, double e, int no, double *Pi){
  * direttamente le sue colonne.
  */
 
-void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no){
+/*void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no){
 	for(int i = 0; i < n; i++){
 		Pik[i] = 0;
 		for(int j = 0; j < n; j++){
@@ -536,27 +536,27 @@ void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no){
 			Pik[i] += P[j*no + i]*Pi0[j];
 		}
 	}
-}
+}*/
 
 /*
  * Descrizione: serve a calcolare i valori finali di pagerank
  */
 
-void getPagrnk_single(int n, float *Pik){
+/*void getPagrnk_single(int n, float *Pik){
 	float somma = 0;
 	for(int i = 0; i < n; i++)
 		somma += fabsf(Pik[i]);
 	for(int i = 0; i < n; i++)
 		Pik[i] = Pik[i]/(float)somma;
-}
+}*/
 
-void getPagrnk_double(int n, double *Pik){
+/*void getPagrnk_double(int n, double *Pik){
 	double somma = 0;
 	for(int i = 0; i < n; i++)
 		somma += fabs(Pik[i]);
 	for(int i = 0; i < n; i++)
 		Pik[i] = Pik[i]/(double)somma;
-}
+}*/
 
 /*
  * Descrizione: si occupa di calcolare il delta delta = ||Pi(k) - Pi(k+1)||1
@@ -564,7 +564,7 @@ void getPagrnk_double(int n, double *Pik){
  * dell'iterazione corrente.
  */
 
-void getDelta_single(float *Pi0, float *Pik, int n, float *delta){
+/*void getDelta_single(float *Pi0, float *Pik, int n, float *delta){
 	for(int i = 0; i < n; i++){
 		*delta += fabsf(Pi0[i]-Pik[i]);
 		Pi0[i] = Pik[i];
@@ -576,17 +576,17 @@ void getDelta_double(double *Pi0, double *Pik, int n, double *delta){
 		*delta += fabs(Pi0[i]-Pik[i]);
 		Pi0[i] = Pik[i];
 	}
-}
+}*/
 
 /*
  * Descrizione: converte i pagerank da float a double
  */
 
-void cvtPagerank(int n, float *Pik, double *Piconv){
+/*void cvtPagerank(int n, float *Pik, double *Piconv){
 	for(int i = 0; i < n; i++){
 		Piconv[i] = (double) Pik[i];
 	}
-}
+}*/
 
 /*
  * Descrizione: esegue il calcolo del delta e del vettore dei pagerank finchè delta > eps
