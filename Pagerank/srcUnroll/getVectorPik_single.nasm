@@ -52,7 +52,7 @@ cicloj:
 	mulps	xmm0, [ecx+esi*4]	;p[j*(n+o)*4+(i...i+p-1)*4]*Pi0[j] --> xmm0
 	addps	xmm1, xmm0		;Pik[i...i+p-1]+= prodotto
 	movaps	xmm0, xmm3
-	mulps	xmm0, [ecx+esi*4+16]		
+	mulps	xmm0, [ecx+esi*4+16]
 	addps	xmm4, xmm0
 	movaps	xmm0, xmm3
 	mulps	xmm0, [ecx+esi*4+32]		

@@ -223,9 +223,8 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 		fprintf(fp, "%.14g\n", pagerank[i]);
 	fclose(fp);
 }
-
 float* get_adiacency_matrix_single(int n, int m, location *l, int *no, float *d);
-float* get_matrix_P_single(int n, float *A, float *d, int no, double c);
+extern void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b);
 extern void getVectorPiIn_single(int n, float e, int no, float *Pi);
 extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no);
 extern void getPagrnk_single(int n, float *Pik);
@@ -235,7 +234,7 @@ void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int
 
 double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *d);
 double* getMatrix(int n, double *P, int *no);
-double* get_matrix_P_double(int n, double *A, double *d, int no, double c);
+extern void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b);
 extern void getVectorPiIn_double(int n, double e, int no, double *Pi);
 extern void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no);
 extern void getPagrnk_double(int n, double *Pik);
@@ -261,11 +260,15 @@ void pagerank(params* input) {
 		 * dove ogni location corrisponde a un arco dal nodo x al nodo y.
 		 */
 		float *d = (float *)_mm_malloc(input->N*sizeof(float), 16);
-		float *A = get_adiacency_matrix_single(input->N, input->M, input->G, &input->NO, d);
-		float e = 1/(float)input->N;
+		float *P = get_adiacency_matrix_single(input->N, input->M, input->G, &input->NO, d);
+		//get_outdegree_single(input->N, A, d, input->NO);
+		float b = 1/(float)input->N;
+		float e = (1-input->c)*b;
 		//Dalla matrice di adiacenza a P''
-		float *P = get_matrix_P_single(input->N, A, d, input->NO, input->c);
-
+		clock_t t = clock();
+		get_matrix_P_single(input->N, P, d, input->NO, input->c, e, b);
+		t = clock() - t;
+		printf("\nExecution time = %.3f seconds\n", ((float)t)/CLOCKS_PER_SEC);
 		/*
 		 * 2° step: passare dalla matrice P a una matrice di transizione valida P'
 		 * data da P'[i][j] >= 0 e somma(P'[i]) = 1.
@@ -289,7 +292,7 @@ void pagerank(params* input) {
 		//get_matrix_P_primo_single(input->N, P, d, input->NO);
 		//get_matrix_P_secondo_single(input->N, P, input->c, input->NO);
 		float* Pi0 =(float*)_mm_malloc(input->NO*sizeof(float),16);
-		getVectorPiIn_single(input->N, e, input->NO, Pi0);
+		getVectorPiIn_single(input->N, b, input->NO, Pi0);
 		float *Pik = (float *)_mm_malloc(input->NO*sizeof(float), 16);
 		input->pagerank = (double *) _mm_malloc(input->NO*sizeof(double), 16);
 		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->NO, input->pagerank);
@@ -297,11 +300,12 @@ void pagerank(params* input) {
 	//precisione doppia
 	else if(!input->format && input->prec){
 		double *d = (double *)_mm_malloc(input->N*sizeof(double), 16);
-		double *A = get_adiacency_matrix_double(input->N, input->M, input->G, &input->NO, d);
-		double *P = get_matrix_P_double(input->N, A, d, input->NO, input->c);
-		double e = 1/(double)input->N;
+		double *P = get_adiacency_matrix_double(input->N, input->M, input->G, &input->NO, d);
+		double b = 1/(double)input->N;
+		double e = (1-input->c)*b;
+		get_matrix_P_double(input->N, P, d, input->NO, input->c, e, b);
 		double* Pi0 =(double*)_mm_malloc(input->NO*sizeof(double),16);
-		getVectorPiIn_double(input->N, e, input->NO, Pi0);
+		getVectorPiIn_double(input->N, b, input->NO, Pi0);
 		input->pagerank = (double *)_mm_malloc(input->NO*sizeof(double), 16);
 		getPagerank_double(Pi0, input->pagerank, P, input->eps, input->N, input->NO);
 	}
@@ -450,8 +454,7 @@ double* getMatrix(int n, double *P, int *no){
  * Uscita = matrice delle probabilità di transizione P = A/d
  */
 
-float* get_matrix_P_single(int n, float *A, float *d, int no, double c){
-	float e = (1-c)*(1/(float)n);
+/*void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b){
 	for(int i = 0; i < n; i++){
 		for(int j = 0; j < n; j++){
 			/*la verifica serve per evitare calcoli inutili
@@ -461,20 +464,18 @@ float* get_matrix_P_single(int n, float *A, float *d, int no, double c){
 			 * Quindi è possibile sostituire direttamente con 1/n
 			 */
 
-			if(d[i] != 0){
+			/*if(d[i] != 0){
 				A[i*no + j] = A[i*no + j]/d[i];
 				A[i*no+j]=c*A[i*no+j] + e;
 			}
 			else{
-				A[i*no+j]= 1/(float)n;
+				A[i*no+j]= b;
 			}
 		}
 	}
-	return A;
-}
+}*/
 
-double* get_matrix_P_double(int n, double *A, double *d, int no, double c){
-		double e = (1-c)*(1/(double)n);
+/*void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b){
 		for(int i = 0; i < n; i++){
 			for(int j = 0; j < n; j++){
 				//la verifica serve per evitare divisioni inutili
@@ -483,12 +484,11 @@ double* get_matrix_P_double(int n, double *A, double *d, int no, double c){
 					A[i*no+j]=c*A[i*no+j] + e;
 				}
 				else{
-					A[i*no+j]= 1/(double)n;
+					A[i*no+j]= b;
 				}
 			}
 		}
-		return A;
-}
+}*/
 
 /*
  * Descrizione: vettore iniziale dei pagerank i cui elementi sono 1/n
