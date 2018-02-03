@@ -265,10 +265,7 @@ void pagerank(params* input) {
 		float b = 1/(float)input->N;
 		float e = (1-input->c)*b;
 		//Dalla matrice di adiacenza a P''
-		clock_t t = clock();
 		get_matrix_P_single(input->N, P, d, input->NO, input->c, e, b);
-		t = clock() - t;
-		printf("\nExecution time = %.3f seconds\n", ((float)t)/CLOCKS_PER_SEC);
 		/*
 		 * 2° step: passare dalla matrice P a una matrice di transizione valida P'
 		 * data da P'[i][j] >= 0 e somma(P'[i]) = 1.
