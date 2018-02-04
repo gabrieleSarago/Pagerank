@@ -8,8 +8,7 @@
 section .data
 	n	equ	8
 	e	equ	12
-	no	equ	16
-	pi	equ	20
+	pi	equ	16
 section	.text
 	global	getVectorPiIn_single
 getVectorPiIn_single:
@@ -18,7 +17,6 @@ getVectorPiIn_single:
 	pushad
 	mov	edi, [ebp+n]
 	mov	ecx, [ebp+pi]		;indirizzo Pi
-	mov	eax, [ebp+no]		;n+o
 	movss	xmm1, [ebp+e]		;1/n
 	shufps	xmm1, xmm1, 0		;duplica 1/n
 	mov	ebx, edi
@@ -38,7 +36,7 @@ cicloi:
 cicloR:
 	cmp	esi, edi
 	jge	fine
-	movss	[ecx+esi*4], xmm0
+	movss	[ecx+esi*4], xmm1
 	inc	esi
 	jmp	cicloR
 fine:

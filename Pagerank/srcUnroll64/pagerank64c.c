@@ -225,7 +225,7 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 }
 float* get_adiacency_matrix_single(int n, int m, location *l, int *no, float *d);
 void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b);
-extern void getVectorPiIn_single(int n, float e, int no, float *Pi);
+extern void getVectorPiIn_single(int n, float e, float *Pi);
 extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no);
 extern void getPagrnk_single(int n, float *Pik);
 extern void getDelta_single(float *Pi0, float *Pik, int n, float *delta);
@@ -235,7 +235,7 @@ void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int
 double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *d);
 double* getMatrix(int n, double *P, int *no);
 void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b);
-extern void getVectorPiIn_double(int n, double e, int no, double *Pi);
+extern void getVectorPiIn_double(int n, double e, double *Pi);
 extern void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no);
 extern void getPagrnk_double(int n, double *Pik);
 extern void getDelta_double(double *Pi0, double *Pik, int n, double *delta);
@@ -289,7 +289,10 @@ void pagerank(params* input) {
 		//get_matrix_P_primo_single(input->N, P, d, input->NO);
 		//get_matrix_P_secondo_single(input->N, P, input->c, input->NO);
 		float* Pi0 =(float*)_mm_malloc(input->NO*sizeof(float),32);
-		getVectorPiIn_single(input->N, b, input->NO, Pi0);
+		getVectorPiIn_single(input->N, b, Pi0);
+		for(int i = 0; i < input->NO; i++){
+			printf("Pi0[%d] = %f\n", i, Pi0[i]);
+		}
 		float *Pik = (float *)_mm_malloc(input->NO*sizeof(float), 32);
 		input->pagerank = (double *) _mm_malloc(input->NO*sizeof(double), 32);
 		getPagerank_single(Pi0, Pik, P, input->eps, input->N, input->NO, input->pagerank);
@@ -302,7 +305,7 @@ void pagerank(params* input) {
 		double e = (1-input->c)*b;
 		get_matrix_P_double(input->N, P, d, input->NO, input->c, e, b);
 		double* Pi0 =(double*)_mm_malloc(input->NO*sizeof(double),32);
-		getVectorPiIn_double(input->N, b, input->NO, Pi0);
+		getVectorPiIn_double(input->N, b, Pi0);
 		input->pagerank = (double *)_mm_malloc(input->NO*sizeof(double), 32);
 		getPagerank_double(Pi0, input->pagerank, P, input->eps, input->N, input->NO);
 	}
@@ -311,7 +314,7 @@ void pagerank(params* input) {
 		input->P = getMatrix(input->N, input->P, &input->NO);
 		double e = 1/(double)input->N;
 		double* Pi0 =(double*)_mm_malloc(input->NO*sizeof(double),32);
-		getVectorPiIn_double(input->N, e, input->NO, Pi0);
+		getVectorPiIn_double(input->N, e, Pi0);
 		input->pagerank = (double *)_mm_malloc(input->NO*sizeof(double), 32);
 		getPagerank_double(Pi0, input->pagerank, input->P, input->eps, input->N, input->NO);
 	}
@@ -491,22 +494,15 @@ void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e
  * Descrizione: vettore iniziale dei pagerank i cui elementi sono 1/n
  */
 
-/*void getVectorPiIn_single(int n, float e, int no, float *Pi){
+/*void getVectorPiIn_single(int n, float e, float *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
-	}
-	/*for(int i = n; i < no; i++){
-		Pi[n+i] = 0;
 	}
 }*/
 
-/*void getVectorPiIn_double(int n, double e, int no, double *Pi){
+/*void getVectorPiIn_double(int n, double e, double *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
-	}
-	//Serve in assembly per evitare che ci sia 1/n al posto degli zeri di padding
-	/*for(int i = n; i < no; i++){
-		Pi[n+i] = 0;
 	}
 }*/
 

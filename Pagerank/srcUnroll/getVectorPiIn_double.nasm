@@ -4,8 +4,7 @@
 section .data
 	n	equ	8
 	e	equ	12
-	no	equ	20
-	pi	equ	24
+	pi	equ	20
 section	.text
 	global	getVectorPiIn_double
 getVectorPiIn_double:
@@ -14,7 +13,6 @@ getVectorPiIn_double:
 	pushad
 	mov	edi, [ebp+n]
 	mov	ecx, [ebp+pi]
-	mov	eax, [ebp+no]
 	movsd	xmm1, [ebp+e]
 	shufpd	xmm1, xmm1, 0
 	mov	ebx, edi
@@ -32,7 +30,7 @@ cicloi:
 cicloR:
 	cmp	esi, edi
 	jge	fine
-	movsd	[ecx+esi*4], xmm0
+	movsd	[ecx+esi*4], xmm1
 	inc	esi
 	jmp	cicloR
 fine:
