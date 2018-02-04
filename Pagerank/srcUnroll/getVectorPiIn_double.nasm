@@ -17,30 +17,25 @@ getVectorPiIn_double:
 	mov	eax, [ebp+no]
 	movsd	xmm1, [ebp+e]
 	shufpd	xmm1, xmm1, 0
+	mov	ebx, edi
+	sub	ebx, 8			;penultima iterazione
 	xor	esi, esi
 cicloi:
-	cmp	esi, edi
-	jge	finecicloi
+	cmp	esi, ebx
+	jge	cicloR
 	movapd	[ecx + esi*8], xmm1
 	movapd	[ecx + esi*8 + 16], xmm1
 	movapd	[ecx + esi*8 + 32], xmm1
 	movapd	[ecx + esi*8 + 48], xmm1
 	add 	esi, 8
 	jmp	cicloi
-finecicloi:
-	xor	esi, esi
-	mov	ebx, edi
-	imul	ebx, 8		;n*8
-	add	ecx, ebx	;Pi+n*8
-	xorps	xmm0, xmm0
-cicloo:
-	cmp	edi, eax
-	jge	finecicloo
-	movss	[ecx+esi*8], xmm0	;Pi[n*8+i*8] = 0
-	inc	edi	
+cicloR:
+	cmp	esi, edi
+	jge	fine
+	movsd	[ecx+esi*4], xmm0
 	inc	esi
-	jmp	cicloo
-finecicloo:
+	jmp	cicloR
+fine:
 	popad
 	mov	esp, ebp
 	pop	ebp

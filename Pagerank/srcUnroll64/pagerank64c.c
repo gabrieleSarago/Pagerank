@@ -360,11 +360,11 @@ double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *
 	int cols = n;
 	//Padding che rende le colonne della matrice multiple di 16 elementi
 	//Dato che il loop unrolling prende 16 elementi per volta
-	if(cols % 16 != 0){
-		int a = n/16;
-		a = a*16;
+	if(cols % 32 != 0){
+		int a = n/32;
+		a = a*32;
 		int b = n-a;
-		o = 16-b;
+		o = 32-b;
 		cols+=o;
 	}
 	*no = cols;
@@ -495,17 +495,17 @@ void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
-	for(int i = n; i < no; i++){
+	/*for(int i = n; i < no; i++){
 		Pi[n+i] = 0;
 	}
-}
+}*/
 
-void getVectorPiIn_double(int n, double e, int no, double *Pi){
+/*void getVectorPiIn_double(int n, double e, int no, double *Pi){
 	for (int i=0; i<n; i++){
 		Pi[i]=e;
 	}
 	//Serve in assembly per evitare che ci sia 1/n al posto degli zeri di padding
-	for(int i = n; i < no; i++){
+	/*for(int i = n; i < no; i++){
 		Pi[n+i] = 0;
 	}
 }*/

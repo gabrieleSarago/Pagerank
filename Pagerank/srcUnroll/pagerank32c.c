@@ -224,7 +224,7 @@ void save_pageranks(char* filename, int n, VECTOR pagerank) {
 	fclose(fp);
 }
 float* get_adiacency_matrix_single(int n, int m, location *l, int *no, float *d);
-extern void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b);
+void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b);
 extern void getVectorPiIn_single(int n, float e, int no, float *Pi);
 extern void getVectorPik_single(float *P, float *Pi0, float *Pik, int n, int no);
 extern void getPagrnk_single(int n, float *Pik);
@@ -234,7 +234,7 @@ void getPagerank_single(float *Pi0, float *Pik, float *P, double eps, int n, int
 
 double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *d);
 double* getMatrix(int n, double *P, int *no);
-extern void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b);
+void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b);
 extern void getVectorPiIn_double(int n, double e, int no, double *Pi);
 extern void getVectorPik_double(double *P, double *Pi0, double *Pik, int n, int no);
 extern void getPagrnk_double(int n, double *Pik);
@@ -451,7 +451,7 @@ double* getMatrix(int n, double *P, int *no){
  * Uscita = matrice delle probabilità di transizione P = A/d
  */
 
-/*void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b){
+void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b){
 	for(int i = 0; i < n; i++){
 		for(int j = 0; j < n; j++){
 			/*la verifica serve per evitare calcoli inutili
@@ -461,7 +461,7 @@ double* getMatrix(int n, double *P, int *no){
 			 * Quindi è possibile sostituire direttamente con 1/n
 			 */
 
-			/*if(d[i] != 0){
+			if(d[i] != 0){
 				A[i*no + j] = A[i*no + j]/d[i];
 				A[i*no+j]=c*A[i*no+j] + e;
 			}
@@ -470,9 +470,9 @@ double* getMatrix(int n, double *P, int *no){
 			}
 		}
 	}
-}*/
+}
 
-/*void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b){
+void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b){
 		for(int i = 0; i < n; i++){
 			for(int j = 0; j < n; j++){
 				//la verifica serve per evitare divisioni inutili
@@ -485,7 +485,7 @@ double* getMatrix(int n, double *P, int *no){
 				}
 			}
 		}
-}*/
+}
 
 /*
  * Descrizione: vettore iniziale dei pagerank i cui elementi sono 1/n
