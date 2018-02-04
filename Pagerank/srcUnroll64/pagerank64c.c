@@ -360,11 +360,11 @@ double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *
 	int cols = n;
 	//Padding che rende le colonne della matrice multiple di 16 elementi
 	//Dato che il loop unrolling prende 16 elementi per volta
-	if(cols % 32 != 0){
-		int a = n/32;
-		a = a*32;
+	if(cols % 16 != 0){
+		int a = n/16;
+		a = a*16;
 		int b = n-a;
-		o = 32-b;
+		o = 16-b;
 		cols+=o;
 	}
 	*no = cols;
@@ -381,18 +381,18 @@ double* get_adiacency_matrix_double(int n, int m, location *l, int *no, double *
 
 /*
  * Descrizione: funzione che ricava una matrice le cui colonne
- * sono multiple di 8, dato che la matrice in input potrebbe non esserlo.
+ * sono multiple di 16, dato che la matrice in input potrebbe non esserlo.
  */
 
 double* getMatrix(int n, double *P, int *no){
 		int cols = n;
 		int o = 0;
-		//Padding che rende le colonne della matrice multiple di 8 elementi
-		if(cols % 8 != 0){
-			int a = cols/8;
-			a = a*8;
+		//Padding che rende le colonne della matrice multiple di 16 elementi
+		if(cols % 16 != 0){
+			int a = cols/16;
+			a = a*16;
 			int b = cols-a;
-			o = 8-b;
+			o = 16-b;
 			cols+=o;
 		}
 		*no = cols;
@@ -453,36 +453,36 @@ double* getMatrix(int n, double *P, int *no){
 
 void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b){
 	for(int i = 0; i < n; i++){
-		for(int j = 0; j < n; j++){
-			/*la verifica serve per evitare calcoli inutili
-			 * Dato che gli elementi con outdegree nullo sono
-			 * sostituiti con 1/n abbiamo che nel calcolo di P'':
-			 * P''[i][j] = c*(1/n) + (1-c)*(1/n) = 1/n
-			 * Quindi è possibile sostituire direttamente con 1/n
-			 */
-
-			if(d[i] != 0){
+		/*la verifica serve per evitare calcoli inutili
+		 * Dato che gli elementi con outdegree nullo sono
+		 * sostituiti con 1/n abbiamo che nel calcolo di P'':
+		 * P''[i][j] = c*(1/n) + (1-c)*(1/n) = 1/n
+		 * Quindi è possibile sostituire direttamente con 1/n
+		 */
+		if(d[i] != 0){
+			for(int j = 0; j < n; j++){
 				A[i*no + j] = A[i*no + j]/d[i];
 				A[i*no+j]=c*A[i*no+j] + e;
 			}
-			else{
+		}
+		else{
+			for(int j = 0; j < n; j++)
 				A[i*no+j]= b;
-			}
 		}
 	}
 }
 
 void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b){
 		for(int i = 0; i < n; i++){
-			for(int j = 0; j < n; j++){
-				//la verifica serve per evitare divisioni inutili
-				if(d[i] != 0){
+			if(d[i] != 0){
+				for(int j = 0; j < n; j++){
 					A[i*no + j] = A[i*no + j]/d[i];
 					A[i*no+j]=c*A[i*no+j] + e;
 				}
-				else{
+			}
+			else{
+				for(int j = 0; j < n; j++)
 					A[i*no+j]= b;
-				}
 			}
 		}
 }

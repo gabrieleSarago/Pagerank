@@ -453,38 +453,38 @@ double* getMatrix(int n, double *P, int *no){
 
 void get_matrix_P_single(int n, float *A, float *d, int no, double c, float e, float b){
 	for(int i = 0; i < n; i++){
-		for(int j = 0; j < n; j++){
-			/*la verifica serve per evitare calcoli inutili
-			 * Dato che gli elementi con outdegree nullo sono
-			 * sostituiti con 1/n abbiamo che nel calcolo di P'':
-			 * P''[i][j] = c*(1/n) + (1-c)*(1/n) = 1/n
-			 * Quindi è possibile sostituire direttamente con 1/n
-			 */
-
-			if(d[i] != 0){
+		/*la verifica serve per evitare calcoli inutili
+		 * Dato che gli elementi con outdegree nullo sono
+		 * sostituiti con 1/n abbiamo che nel calcolo di P'':
+		 * P''[i][j] = c*(1/n) + (1-c)*(1/n) = 1/n
+		 * Quindi è possibile sostituire direttamente con 1/n
+		 */
+		if(d[i] != 0){
+			for(int j = 0; j < n; j++){
 				A[i*no + j] = A[i*no + j]/d[i];
 				A[i*no+j]=c*A[i*no+j] + e;
 			}
-			else{
+		}
+		else{
+			for(int j = 0; j < n; j++)
 				A[i*no+j]= b;
-			}
 		}
 	}
 }
 
 void get_matrix_P_double(int n, double *A, double *d, int no, double c, double e, double b){
-		for(int i = 0; i < n; i++){
+	for(int i = 0; i < n; i++){
+		if(d[i] != 0){
 			for(int j = 0; j < n; j++){
-				//la verifica serve per evitare divisioni inutili
-				if(d[i] != 0){
-					A[i*no + j] = A[i*no + j]/d[i];
-					A[i*no+j]=c*A[i*no+j] + e;
-				}
-				else{
-					A[i*no+j]= b;
-				}
+				A[i*no + j] = A[i*no + j]/d[i];
+				A[i*no+j]=c*A[i*no+j] + e;
 			}
 		}
+		else{
+			for(int j = 0; j < n; j++)
+				A[i*no+j]= b;
+		}
+	}
 }
 
 /*
